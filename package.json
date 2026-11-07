@@ -1,19 +1,19 @@
 {
-  "name": "ai-buddy",
+  "name": "namaste-world",
   "version": "0.1.0-alpha.2",
   "private": true,
-  "description": "AI Buddy desktop app (Tauri + React + TypeScript)",
+  "description": "Namaste World desktop app (Tauri + React + TypeScript)",
   "author": {
     "name": "Go-bugi",
     "url": "https://github.com/Go-bugi"
   },
-  "homepage": "https://github.com/Go-bugi/ai-buddy",
+  "homepage": "https://github.com/Go-bugi/namaste-world",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Go-bugi/ai-buddy.git"
+    "url": "git+https://github.com/Go-bugi/namaste-world.git"
   },
   "bugs": {
-    "url": "https://github.com/Go-bugi/ai-buddy/issues"
+    "url": "https://github.com/Go-bugi/namaste-world/issues"
   },
   "packageManager": "pnpm@10.34.6",
   "engines": {

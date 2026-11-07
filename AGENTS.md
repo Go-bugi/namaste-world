@@ -38,7 +38,7 @@ pnpm build:mac        # dmg 패키징. build:win은 nsis 설치 파일, build:wi
   3. 플러그인이나 코어 API를 쓰면 `src-tauri/capabilities/default.json`의 `permissions`에 필요한 권한만 추가합니다.
 - **CSP는 `tauri.conf.json`의 `app.security.csp`에서 설정합니다.** `index.html`에 `<meta>`로 넣지 않습니다. IPC가 `ipc:`/`http://ipc.localhost`를 쓰므로 `connect-src`에서 이 둘을 빼면 안 됩니다.
 - **tsconfig는 둘로 나뉩니다.** `tsconfig.node.json`은 `vite.config.ts`를, `tsconfig.web.json`은 renderer를 다룹니다. renderer에서는 `@renderer/*` 별칭으로 `src/renderer/src`를 가리킵니다.
-- 앱 ID는 `tauri.conf.json`의 `identifier`(`com.aibuddy.app`)입니다. Windows 알림과 작업 표시줄 그룹에도 이 값이 쓰입니다.
+- 앱 ID는 `tauri.conf.json`의 `identifier`(`com.namasteworld.app`)입니다. Windows 알림과 작업 표시줄 그룹에도 이 값이 쓰입니다.
 - **앱 버전은 `package.json` 하나에서 옵니다.** `tauri.conf.json`의 `version`이 `"../package.json"`을 가리킵니다. `Cargo.toml`의 `version`은 `0.0.0`으로 고정하고 올리지 않습니다. 올리면 브랜치마다 값이 달라져 back-merge 때 `Cargo.toml`, `Cargo.lock`이 충돌합니다.
 - 렌더러 의존성은 Vite가 번들하므로 지금처럼 `devDependencies`에 추가합니다. Rust 의존성은 `src-tauri/Cargo.toml`에 추가하고 `Cargo.lock`도 커밋합니다(CI가 `--locked`로 검사).
 

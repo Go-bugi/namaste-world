@@ -12,7 +12,7 @@ function Versions(): React.JSX.Element {
 
   return (
     <ul className="versions">
-      {appVersion && <li className="app-version">AI Buddy v{appVersion}</li>}
+      {appVersion && <li className="app-version">Namaste World v{appVersion}</li>}
       {tauriVersion && <li className="tauri-version">Tauri v{tauriVersion}</li>}
     </ul>
   );

@@ -1,6 +1,6 @@
 ---
 name: commit
-description: 이 저장소(ai-buddy)의 변경 사항을 Conventional Commits 형식으로 커밋합니다. diff를 읽고 type과 scope를 고르고, PR 제목 검사와 같은 commitlint 형식 규칙(설명 첫 글자 대문자 금지 등)을 지켜 한국어 명사구로 메시지를 쓰고 커밋합니다. release-please 브랜치 전략(develop, release/*, main)과 예약 타입(release, promote)을 고려하고, 서로 다른 변경이 섞여 있거나 실수로 staging된 파일이 보이면 나눠서 커밋할지 먼저 확인합니다. 사용자가 "커밋해 줘", "커밋 메시지 써 줘", "이거 나눠서 커밋해", "변경 사항 정리해서 올려", "/commit"이라고 하거나, 작업을 마치고 커밋을 남겨 달라고 할 때 반드시 이 스킬을 사용하세요. PR 제목이나 PR 생성은 이 스킬의 범위가 아닙니다.
+description: 이 저장소의 변경 사항을 Conventional Commits 형식으로 커밋합니다. diff를 읽고 type과 scope를 고르고, PR 제목 검사와 같은 commitlint 형식 규칙(설명 첫 글자 대문자 금지 등)을 지켜 한국어 명사구로 메시지를 쓰고 커밋합니다. release-please 브랜치 전략(develop, release/*, main)과 예약 타입(release, promote)을 고려하고, 서로 다른 변경이 섞여 있거나 실수로 staging된 파일이 보이면 나눠서 커밋할지 먼저 확인합니다. 사용자가 "커밋해 줘", "커밋 메시지 써 줘", "이거 나눠서 커밋해", "변경 사항 정리해서 올려", "/commit"이라고 하거나, 작업을 마치고 커밋을 남겨 달라고 할 때 반드시 이 스킬을 사용하세요. PR 제목이나 PR 생성은 이 스킬의 범위가 아닙니다.
 ---
 
 # commit

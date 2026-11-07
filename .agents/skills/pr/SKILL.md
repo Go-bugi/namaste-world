@@ -1,6 +1,6 @@
 ---
 name: pr
-description: 이 저장소(ai-buddy)에서 지금 브랜치의 Pull Request를 만듭니다. 브랜치가 갈라져 나온 곳으로 base(develop, main, release/*)를 정하고, release-please 릴리스 노트에 그대로 들어갈 PR 제목을 쓰고, .github/PULL_REQUEST_TEMPLATE.md를 채운 본문을 보여 준 뒤 확인을 받고 push와 gh pr create까지 합니다. 머지되면 버전과 릴리스 노트가 어떻게 바뀌는지도 함께 알려 줍니다. 사용자가 "PR 올려 줘", "PR 만들어 줘", "풀리퀘 열어 줘", "PR 제목 정해 줘", "PR 본문 써 줘", "이 브랜치 develop에 올려", "리뷰 요청할 수 있게 해 줘", "/pr"이라고 하거나, 작업을 마치고 머지 준비를 해 달라고 할 때 반드시 이 스킬을 사용하세요. 이미 열린 PR의 제목이나 본문을 고칠 때도 씁니다. 커밋은 commit 스킬, 머지와 릴리스 단계 전환(Promote)은 이 스킬의 범위가 아닙니다.
+description: 이 저장소에서 지금 브랜치의 Pull Request를 만듭니다. 브랜치가 갈라져 나온 곳으로 base(develop, main, release/*)를 정하고, release-please 릴리스 노트에 그대로 들어갈 PR 제목을 쓰고, .github/PULL_REQUEST_TEMPLATE.md를 채운 본문을 보여 준 뒤 확인을 받고 push와 gh pr create까지 합니다. 머지되면 버전과 릴리스 노트가 어떻게 바뀌는지도 함께 알려 줍니다. 사용자가 "PR 올려 줘", "PR 만들어 줘", "풀리퀘 열어 줘", "PR 제목 정해 줘", "PR 본문 써 줘", "이 브랜치 develop에 올려", "리뷰 요청할 수 있게 해 줘", "/pr"이라고 하거나, 작업을 마치고 머지 준비를 해 달라고 할 때 반드시 이 스킬을 사용하세요. 이미 열린 PR의 제목이나 본문을 고칠 때도 씁니다. 커밋은 commit 스킬, 머지와 릴리스 단계 전환(Promote)은 이 스킬의 범위가 아닙니다.
 ---
 
 # pr
