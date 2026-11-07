@@ -33,14 +33,80 @@ pnpm build:mac        # dmg 패키징. build:win은 nsis 설치 파일, build:wi
 - **Tauri CLI가 Vite를 부릅니다.** `pnpm dev`(`tauri dev`)는 `beforeDevCommand`로 `pnpm dev:web`(Vite, 5173 `strictPort`)를 띄우고 그 주소를 웹뷰에 엽니다. `tauri build`는 `beforeBuildCommand`로 `pnpm build`를 돌린 뒤 `out/renderer`를 실행 파일에 넣습니다.
 - **웹뷰는 OS마다 다릅니다.** macOS는 WKWebView(Safari 계열), Windows는 WebView2(Chromium)입니다. CSS와 Web API는 Safari에서도 동작하는지 확인하고, `vite.config.ts`의 `build.target`도 플랫폼에 따라 다르게 잡습니다.
 - **renderer는 OS에 직접 접근할 수 없습니다.** Rust 명령이나 플러그인을 거쳐야 하고, 쓸 수 있는 기능은 `src-tauri/capabilities/*.json`에 선언한 권한으로 제한됩니다. 기능을 추가할 때는 아래를 함께 고칩니다.
-  1. `src-tauri/src/lib.rs`에 `#[tauri::command]` 함수를 만들고 `generate_handler!`에 등록합니다.
-  2. `src/renderer/src/api.ts`의 `api`에 그 명령을 `invoke`로 감싸는 함수를 추가합니다. 컴포넌트에서 `invoke`를 직접 부르지 않습니다.
-  3. 플러그인이나 코어 API를 쓰면 `src-tauri/capabilities/default.json`의 `permissions`에 필요한 권한만 추가합니다.
+  1. `src-tauri/src/commands/`에 `#[tauri::command]` 함수를 만들고 `lib.rs`의 `generate_handler!`에 등록합니다.
+  2. `src/renderer/src/api/`의 `api`에 그 명령을 `invoke`로 감싸는 함수를 추가합니다. 컴포넌트에서 `invoke`를 직접 부르지 않습니다.
+  3. 플러그인이나 코어 API를 쓰면 그 기능을 쓰는 창의 capability 파일(`src-tauri/capabilities/<창 이름>.json`)에서 `permissions`에 필요한 권한만 추가합니다.
 - **CSP는 `tauri.conf.json`의 `app.security.csp`에서 설정합니다.** `index.html`에 `<meta>`로 넣지 않습니다. IPC가 `ipc:`/`http://ipc.localhost`를 쓰므로 `connect-src`에서 이 둘을 빼면 안 됩니다.
 - **tsconfig는 둘로 나뉩니다.** `tsconfig.node.json`은 `vite.config.ts`를, `tsconfig.web.json`은 renderer를 다룹니다. renderer에서는 `@renderer/*` 별칭으로 `src/renderer/src`를 가리킵니다.
 - 앱 ID는 `tauri.conf.json`의 `identifier`(`com.aibuddy.app`)입니다. Windows 알림과 작업 표시줄 그룹에도 이 값이 쓰입니다.
 - **앱 버전은 `package.json` 하나에서 옵니다.** `tauri.conf.json`의 `version`이 `"../package.json"`을 가리킵니다. `Cargo.toml`의 `version`은 `0.0.0`으로 고정하고 올리지 않습니다. 올리면 브랜치마다 값이 달라져 back-merge 때 `Cargo.toml`, `Cargo.lock`이 충돌합니다.
 - 렌더러 의존성은 Vite가 번들하므로 지금처럼 `devDependencies`에 추가합니다. Rust 의존성은 `src-tauri/Cargo.toml`에 추가하고 `Cargo.lock`도 커밋합니다(CI가 `--locked`로 검사).
+
+## 폴더 구조
+
+코드는 아래 구조에 맞춰 둡니다. 기존 파일(`App.tsx`, `api.ts`, `lib.rs`, `capabilities/default.json` 등)은 아직 이 구조로 옮기지 않았습니다.
+
+```
+src/renderer/
+  index.html            # main 창 진입 HTML. 창이 늘면 <창 이름>.html을 추가
+  public/               # 웹뷰가 URL로 읽는 정적 파일 (models/, draco/, hdr/, sounds/)
+  src/
+    windows/<창 이름>/   # 창별 진입점(main.tsx, App.tsx). 화면 조립만 함
+    scene/              # R3F(Canvas 안) 코드
+    features/<기능>/     # 기능 단위 UI, 훅, 그 기능에서만 쓰는 store
+    stores/             # 여러 곳이 같이 쓰는 zustand store
+    api/                # Rust 명령과 이벤트를 감싼 함수. invoke, listen은 여기서만 부름
+    types/ipc.ts        # 명령 인자와 반환값, 이벤트 payload 타입
+    shared/             # 두 기능 이상이 쓰는 코드 (ui/, lib/)
+    dev/                # 개발 전용 코드 (leva-stub 등)
+    assets/             # import해서 번들에 넣는 CSS, 작은 이미지
+
+src-tauri/
+  src/
+    main.rs
+    lib.rs              # Builder 조립만 함
+    error.rs            # 명령이 돌려주는 공통 에러 타입
+    state.rs            # app.manage()로 등록하는 상태
+    events.rs           # 이벤트 이름 상수와 payload 타입
+    commands/           # #[tauri::command] 함수
+    window/<창 이름>.rs  # 창 생성과 설정
+    platform/           # OS별 코드 (macos.rs, windows.rs)
+    tray.rs
+    ai/, db/ …          # 앱 로직 모듈
+  capabilities/<창 이름>.json
+  resources/            # Rust가 읽는 파일. tauri.conf.json의 bundle.resources에 등록
+```
+
+### 원칙
+
+- 폴더는 넣을 파일이 생길 때 만듭니다. 빈 폴더나 `.gitkeep`만 있는 폴더는 만들지 않습니다.
+- `windows/<창 이름>/`에서는 화면을 조립만 합니다. 로직은 `scene/`, `features/`, `stores/`에 둡니다.
+- `scene/`과 `features/`는 서로 import하지 않습니다. 둘이 같이 쓰는 상태는 `stores/`에 둡니다.
+- 기능 하나에서만 쓰는 코드와 store는 `features/<기능>/` 안에 둡니다. 두 기능 이상이 쓰게 되면 코드는 `shared/`로, store는 `stores/`로 옮깁니다.
+- `hooks/`, `utils/`, `constants/` 같은 최상위 폴더는 만들지 않습니다. 기능 폴더나 `shared/` 안에 둡니다.
+- Rust는 `commands/`가 로직 모듈(`ai/`, `db/` 등)을 부르는 방향으로만 의존합니다. 로직 모듈은 `tauri`를 import하지 않습니다.
+- `#[cfg(target_os = ...)]` 코드는 `platform/`에만 둡니다.
+- 이벤트 이름과 payload는 `events.rs`와 `types/ipc.ts`에 같은 이름으로 정의합니다.
+
+### 창 추가하기
+
+창을 하나 추가할 때는 아래 다섯 곳을 함께 고칩니다.
+
+| 위치                        | 추가할 것                                    |
+| --------------------------- | -------------------------------------------- |
+| `src/renderer/`             | `<창 이름>.html`, `src/windows/<창 이름>/`   |
+| `vite.config.ts`            | `build.rollupOptions.input`에 HTML 등록      |
+| `src-tauri/tauri.conf.json` | `app.windows`에 창 `label`과 `url`           |
+| `src-tauri/src/window/`     | `<창 이름>.rs`                               |
+| `src-tauri/capabilities/`   | `<창 이름>.json`. 그 창에 필요한 권한만 넣음 |
+
+## 문서와 주석
+
+- 한국어 문서(README, AGENTS.md 등), PR 본문, 커밋 메시지, 코드 주석은 `korean-tech-writing` 스킬을 따라 씁니다.
+- 코드가 무엇을 하는지, 왜 그렇게 해야 하는지만 씁니다. 내부 논의 과정이나 의사결정 경위, 검토했다가 버린 방안은 쓰지 않습니다.
+  - ✓ `// Windows에서 바이너리와 이름이 같으면 빌드가 깨지므로 _lib을 붙인다`
+  - ✗ `// 처음엔 이름을 그대로 썼는데 논의 끝에 _lib을 붙이기로 했다`
+- 명확하고 이해하기 쉽게 쓰되 장황하지 않게 씁니다. 코드만 읽어도 알 수 있는 내용은 주석으로 반복하지 않습니다.
 
 ## 브랜치 전략과 릴리스
 
