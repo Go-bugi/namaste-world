@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.3](https://github.com/Go-bugi/namaste-world/compare/v0.1.0-alpha.2...v0.1.0-alpha.3) (2026-11-08)
+
+
+### Features
+
+* **ui:** 시작 화면에 3D 데모 씬 추가 ([#5](https://github.com/Go-bugi/namaste-world/issues/5)) ([cfc5998](https://github.com/Go-bugi/namaste-world/commit/cfc5998a3f0ec9f58cea96ea608baddf71b19039))
+
 ## [0.1.0-alpha.2](https://github.com/Go-bugi/ai-buddy/compare/v0.1.0-alpha.1...v0.1.0-alpha.2) (2026-11-01)
 
 
