@@ -41,6 +41,7 @@ pnpm build:mac        # dmg 패키징. build:win은 nsis 설치 파일, build:wi
 - 앱 ID는 `tauri.conf.json`의 `identifier`(`com.aibuddy.app`)입니다. Windows 알림과 작업 표시줄 그룹에도 이 값이 쓰입니다.
 - **앱 버전은 `package.json` 하나에서 옵니다.** `tauri.conf.json`의 `version`이 `"../package.json"`을 가리킵니다. `Cargo.toml`의 `version`은 `0.0.0`으로 고정하고 올리지 않습니다. 올리면 브랜치마다 값이 달라져 back-merge 때 `Cargo.toml`, `Cargo.lock`이 충돌합니다.
 - 렌더러 의존성은 Vite가 번들하므로 지금처럼 `devDependencies`에 추가합니다. Rust 의존성은 `src-tauri/Cargo.toml`에 추가하고 `Cargo.lock`도 커밋합니다(CI가 `--locked`로 검사).
+- 기획 문서는 `design/`에 둡니다. 기능별 MVP 결정은 `design/mvp-feature-decisions.md`에 있고, 아직 정하지 않은 항목이 남아 있으니 기능을 만들기 전에 읽으세요.
 
 ## 브랜치 전략과 릴리스
 
