@@ -1,9 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "AI Buddy",
-  "mainBinaryName": "ai-buddy",
+  "productName": "Namaste World",
+  "mainBinaryName": "namaste-world",
   "version": "../package.json",
-  "identifier": "com.aibuddy.app",
+  "identifier": "com.namasteworld.app",
   "build": {
     "beforeDevCommand": "pnpm dev:web",
     "devUrl": "http://localhost:5173",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "AI Buddy",
+        "title": "Namaste World",
         "width": 900,
         "height": 670
       }

@@ -1,4 +1,4 @@
-# AI Buddy
+# Namaste World
 
 Tauri 2 + React + TypeScript + Vite 데스크톱 앱.
 
@@ -222,7 +222,7 @@ gitGraph
 
 Tauri는 각 OS에서 빌드하는 것을 기준으로 합니다. Windows 설치 파일은 Windows에서, macOS dmg는 Mac에서 만듭니다. Mac에서 Intel용을 만들려면 `rustup target add x86_64-apple-darwin` 후 `pnpm tauri build --target x86_64-apple-darwin --bundles dmg`를 실행합니다.
 
-release-please가 릴리스를 만들면 `.github/workflows/release-please.yml`이 macOS(arm64, x64) / Windows(x64) 러너에서 각각 빌드해 `ai-buddy-<version>-mac-arm64.dmg`, `ai-buddy-<version>-win-x64-setup.exe` 같은 이름으로 GitHub Release에 업로드합니다. PR에서는 `pr-check.yml`이 포맷, 린트, 타입체크, renderer 빌드와 Rust 검사(rustfmt, clippy)만 확인합니다.
+release-please가 릴리스를 만들면 `.github/workflows/release-please.yml`이 macOS(arm64, x64) / Windows(x64) 러너에서 각각 빌드해 `namaste-world-<version>-mac-arm64.dmg`, `namaste-world-<version>-win-x64-setup.exe` 같은 이름으로 GitHub Release에 업로드합니다. PR에서는 `pr-check.yml`이 포맷, 린트, 타입체크, renderer 빌드와 Rust 검사(rustfmt, clippy)만 확인합니다.
 
 ### 코드 서명
 

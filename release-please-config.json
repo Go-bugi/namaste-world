@@ -67,7 +67,7 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "ai-buddy",
+      "package-name": "namaste-world",
       "bump-minor-pre-major": true
     }
   }

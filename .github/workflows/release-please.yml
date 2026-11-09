@@ -105,12 +105,12 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          # Tauri 기본 파일 이름(AI Buddy_1.3.0_aarch64.dmg)을 기존 이름 규칙으로 바꾼다.
+          # Tauri 기본 파일 이름(Namaste World_1.3.0_aarch64.dmg)을 기존 이름 규칙으로 바꾼다.
           files=()
           for f in src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}/*.{dmg,exe}; do
             case "$f" in
-              *.dmg) name="ai-buddy-${VERSION}-${{ matrix.asset }}.dmg" ;;
-              *.exe) name="ai-buddy-${VERSION}-${{ matrix.asset }}-setup.exe" ;;
+              *.dmg) name="namaste-world-${VERSION}-${{ matrix.asset }}.dmg" ;;
+              *.exe) name="namaste-world-${VERSION}-${{ matrix.asset }}-setup.exe" ;;
             esac
             cp "$f" "$name"
             files+=("$name")
