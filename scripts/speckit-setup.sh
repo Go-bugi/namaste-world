@@ -14,6 +14,7 @@ EXTENSIONS=(
 )
 PRESET_DIR=".specify-src/presets/namaste"
 AUTOPILOT_DIR=".specify-src/extensions/autopilot"
+WORKFLOW_FILE=".specify-src/workflows/namaste/workflow.yml"
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -84,6 +85,12 @@ rebuild() {
     render_for_both extension autopilot
   fi
 
+  if [[ -f "$WORKFLOW_FILE" ]]; then
+    log "namaste workflow 등록"
+    specify workflow remove namaste >/dev/null 2>&1 || true
+    specify workflow add --dev "$WORKFLOW_FILE" >/dev/null
+  fi
+
   # integration use가 core 스크립트의 실행 권한을 지운다(spec-kit 1.2.3).
   chmod +x .specify/scripts/bash/*.sh
 }
@@ -106,6 +113,9 @@ check() {
   if [[ -d "$AUTOPILOT_DIR" ]]; then
     jq -e '.extensions.autopilot.enabled' .specify/extensions/.registry >/dev/null 2>&1 \
       || { echo "  ✗ 확장 autopilot 없음"; ok=0; }
+  fi
+  if [[ -f "$WORKFLOW_FILE" ]]; then
+    cmp -s "$WORKFLOW_FILE" .specify/workflows/namaste/workflow.yml || { echo "  ✗ 설치된 namaste workflow가 원본과 다름(--rebuild 필요)"; ok=0; }
   fi
   command -v claude >/dev/null 2>&1 || command -v codex >/dev/null 2>&1 || { echo "  ✗ claude나 codex CLI가 하나는 있어야 함"; ok=0; }
   [[ "$ok" == 1 ]] || fail "점검 실패"

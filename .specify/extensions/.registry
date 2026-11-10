@@ -51,6 +51,37 @@
       },
       "registered_skills": [],
       "installed_at": "2026-11-10T16:23:22.589017+00:00"
+    },
+    "autopilot": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:e038b94bd54f689f47e32bd2b4dd6fd70873b2b91edd6632976bce9037cab8a7",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.autopilot.context",
+          "speckit.autopilot.clarify-ask",
+          "speckit.autopilot.clarify-apply",
+          "speckit.autopilot.conflicts",
+          "speckit.autopilot.fix",
+          "speckit.autopilot.analyze",
+          "speckit.autopilot.test-write",
+          "speckit.autopilot.review"
+        ],
+        "codex": [
+          "speckit.autopilot.context",
+          "speckit.autopilot.clarify-ask",
+          "speckit.autopilot.clarify-apply",
+          "speckit.autopilot.conflicts",
+          "speckit.autopilot.fix",
+          "speckit.autopilot.analyze",
+          "speckit.autopilot.test-write",
+          "speckit.autopilot.review"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-11-10T16:33:19.782021+00:00"
     }
   }
 }

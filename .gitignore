@@ -53,3 +53,5 @@ ehthumbs.db
 .specify/workflows/runs/
 # 확장 카탈로그 캐시
 .specify/extensions/.cache/
+# autopilot 루프가 한 번 실행하는 동안 쓰는 임시 파일
+.specify/autopilot/

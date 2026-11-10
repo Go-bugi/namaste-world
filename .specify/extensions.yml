@@ -1,5 +1,6 @@
 installed:
 - archive
+- autopilot
 - memory-loader
 - reconcile
 settings:
