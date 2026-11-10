@@ -48,3 +48,6 @@ ehthumbs.db
 
 # 에이전트 로컬 상태 (oh-my-claudecode)
 .omc/
+
+# spec-kit workflow 실행 상태 (run ID별 진행 기록. 실행한 사람의 로컬 상태)
+.specify/workflows/runs/

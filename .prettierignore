@@ -11,3 +11,6 @@ build/*.plist
 CHANGELOG.md
 .agents
 src/renderer/src/types/bindings
+# spec-kit이 만들고 관리하는 파일 (archive가 memory를 다시 쓰고, CLI가 스킬을 갱신함)
+.specify
+.claude/skills/speckit-*
