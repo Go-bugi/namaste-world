@@ -113,6 +113,8 @@ check() {
   if [[ -d "$AUTOPILOT_DIR" ]]; then
     jq -e '.extensions.autopilot.enabled' .specify/extensions/.registry >/dev/null 2>&1 \
       || { echo "  ✗ 확장 autopilot 없음"; ok=0; }
+    diff -rq -x .specify-dev "$AUTOPILOT_DIR" .specify/extensions/autopilot >/dev/null \
+      || { echo "  ✗ 설치된 autopilot이 원본과 다름(--rebuild 필요)"; ok=0; }
   fi
   if [[ -f "$WORKFLOW_FILE" ]]; then
     cmp -s "$WORKFLOW_FILE" .specify/workflows/namaste/workflow.yml || { echo "  ✗ 설치된 namaste workflow가 원본과 다름(--rebuild 필요)"; ok=0; }

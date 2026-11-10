@@ -24,6 +24,10 @@ cp -R "$dir/contracts/." "$input/contracts/"
 # 테스트 규칙 문서: code-writer 라우팅 표의 "테스트" 행이 가리키는 곳만.
 extract_section() {
   local file="$1" start="$2"
+  if [[ ! -f "$file" ]]; then
+    echo "($file 없음. 이 규칙 없이 테스트를 씁니다.)"
+    return
+  fi
   awk -v s="$start" '
     !on && index($0, s) == 1 { on = 1; level = match($0, /[^#]/) - 1; print; next }
     on && /^#+ / { if (match($0, /[^#]/) - 1 <= level) exit }

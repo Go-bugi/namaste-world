@@ -63,7 +63,7 @@ check_clarify_ask() {
 check_checklist() {
   local file fixable decision
   file="$(feature_dir)/checklists/testability.md"
-  [[ -f "$file" ]] || halt "checklist가 $file을 만들지 않았습니다" "checklist 단계 출력을 확인합니다."
+  [[ -f "$file" ]] || halt "checklist가 ${file}을 만들지 않았습니다" "checklist 단계 출력을 확인합니다."
   decision="$(grep -E '^- \[ \]' "$file" | grep -cE '\[결정 필요\]' || true)"
   fixable="$(grep -E '^- \[ \]' "$file" | grep -E '\[(Gap|Ambiguity|Conflict)\]' | grep -cvE '\[결정 필요\]' || true)"
   emit "$(jq -n --argjson f "$fixable" --argjson d "$decision" '{fixable: $f, decision: $d, again: ($f > 0)}')"
@@ -72,7 +72,7 @@ check_checklist() {
 check_conflicts() {
   local file contradictions replacements
   file="$(feature_dir)/conflicts.md"
-  [[ -f "$file" ]] || halt "충돌 검사가 $file을 만들지 않았습니다" "conflicts 단계 출력을 확인합니다."
+  [[ -f "$file" ]] || halt "충돌 검사가 ${file}을 만들지 않았습니다" "conflicts 단계 출력을 확인합니다."
   contradictions="$(count_lines '^- \[모순\]' "$file")"
   replacements="$(count_lines '^- \[대체\]' "$file")"
   emit "$(jq -n --argjson c "$contradictions" --argjson r "$replacements" \
@@ -162,7 +162,7 @@ check_model() {
   if pnpm -s typecheck >"$log" 2>&1 && (cd src-tauri && cargo check --quiet --tests) >>"$log" 2>&1; then
     emit '{"compiles": true}'
   else
-    halt "B4-1 모델링 결과가 컴파일되지 않습니다" "$log를 보고 contracts와 시그니처를 맞춥니다."
+    halt "B4-1 모델링 결과가 컴파일되지 않습니다" "${log}를 보고 contracts와 시그니처를 맞춥니다."
   fi
 }
 

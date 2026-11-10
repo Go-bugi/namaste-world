@@ -19,7 +19,7 @@ feature_dir() {
   dir="$(jq -r '.feature_directory // empty' "$fj")"
   [[ -n "$dir" ]] || die ".specify/feature.json에 feature_directory가 없습니다."
   dir="${dir#"$REPO_ROOT"/}"
-  [[ -d "$dir" ]] || die "기능 디렉터리 $dir이(가) 없습니다."
+  [[ -d "$dir" ]] || die "기능 디렉터리 ${dir}이(가) 없습니다."
   printf '%s' "$dir"
 }
 
@@ -52,8 +52,13 @@ error_signature() {
 }
 
 # 작업 트리 내용의 해시(커밋되지 않은 변경 포함). 진전 없음 판정에 쓴다.
+# 루프가 매번 쓰는 기록(specs/*/loop/)은 빼야 "아무것도 안 바뀜"을 알아볼 수 있다.
 worktree_hash() {
-  { git diff HEAD; git ls-files --others --exclude-standard -z | xargs -0 cat 2>/dev/null; } | sha
+  local exclude=':(exclude,glob)specs/**/loop/**'
+  {
+    git diff HEAD -- . "$exclude"
+    git ls-files --others --exclude-standard -z -- . "$exclude" | xargs -0 cat 2>/dev/null
+  } | sha
 }
 
 # 이전 기록(jsonl 마지막 줄)의 값. 없으면 빈 문자열.
