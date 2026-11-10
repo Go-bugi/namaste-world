@@ -8,6 +8,11 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
+# macOS가 잠자기에 들어가면 에이전트의 네트워크가 끊기고 단계 timeout 시계도 멈춘다. 실행하는 동안 잠자기를 막는다.
+if [[ "$(uname)" == Darwin && -z "${SPECKIT_CAFFEINATED:-}" ]] && command -v caffeinate >/dev/null 2>&1; then
+  SPECKIT_CAFFEINATED=1 exec caffeinate -i "$PWD/scripts/speckit-run.sh" "$@"
+fi
+
 usage() { sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
 spec="" plan="" maker="claude" checker="" resume=""
