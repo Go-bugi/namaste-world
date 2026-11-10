@@ -1,0 +1,7 @@
+# cargo는 실행한 디렉터리부터 위로 올라가며 설정을 찾는다.
+# 루트(pnpm test:rust)와 src-tauri(tauri dev) 어디서 실행해도 읽히도록 저장소 루트에 둔다.
+[env]
+# ts-rs가 Rust 타입에서 만든 TS 타입을 쓰는 위치. 이 파일 기준 상대 경로
+TS_RS_EXPORT_DIR = { value = "src/renderer/src/types/bindings", relative = true }
+# u64 같은 큰 정수를 bigint 대신 number로 만든다. JSON 역직렬화 결과와 맞추기 위해서다
+TS_RS_LARGE_INT = "number"
