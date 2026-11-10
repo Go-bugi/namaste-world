@@ -66,6 +66,22 @@ json() { jq -r "$1" <<<"$output"; }
   [ "$(json .replacements)" = 1 ]
 }
 
+# conflicts: [결정]은 GATE-1로 넘기고 spec 수정을 다시 돌리지 않음
+@test "conflicts sends decisions to gate1 without retry" {
+  printf -- '- [결정] Domain NEW: constitution 표에 없음\n' >"$F/conflicts.md"
+  run bash $S/check.sh conflicts
+  [ "$(json .decisions)" = 1 ]
+  [ "$(json .again)" = false ]
+}
+
+# model: Phase 1 작업이 남아 있으면 컴파일과 상관없이 HALT
+@test "model halts when phase 1 tasks are open" {
+  printf '## Phase 1: Modeling\n- [x] T001 a\n- [ ] T002 b\n## Phase 2: Tests\n- [ ] T003 c\n' >"$F/tasks.md"
+  run bash $S/check.sh model
+  [ "$status" -eq 1 ]
+  grep -q 'Phase 1 미완료 작업 1개' "$F/loop/halt.md"
+}
+
 # analyze: CRITICAL, HIGH가 0이면 통과
 @test "analyze passes with zero critical and high" {
   printf 'x\nCOUNTS: critical=0 high=0 medium=3 low=1\n' >"$F/loop/analyze.md"

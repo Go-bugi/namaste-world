@@ -70,13 +70,15 @@ check_checklist() {
 }
 
 check_conflicts() {
-  local file contradictions replacements
+  local file contradictions replacements decisions
   file="$(feature_dir)/conflicts.md"
   [[ -f "$file" ]] || halt "충돌 검사가 ${file}을 만들지 않았습니다" "conflicts 단계 출력을 확인합니다."
   contradictions="$(count_lines '^- \[모순\]' "$file")"
   replacements="$(count_lines '^- \[대체\]' "$file")"
-  emit "$(jq -n --argjson c "$contradictions" --argjson r "$replacements" \
-    '{contradictions: $c, replacements: $r, again: ($c > 0)}')"
+  # [결정]은 spec을 고쳐서 풀 수 없고 GATE-1에서 사람이 정하므로 재시도하지 않는다.
+  decisions="$(count_lines '^- \[결정\]' "$file")"
+  emit "$(jq -n --argjson c "$contradictions" --argjson r "$replacements" --argjson d "$decisions" \
+    '{contradictions: $c, replacements: $r, decisions: $d, again: ($c > 0)}')"
 }
 
 # GATE-1에서 사람이 볼 요약.
@@ -90,7 +92,7 @@ check_gate1() {
     echo "- spec: $dir/spec.md"
     echo "- 남은 clarify 질문: $(jq -r '.questions - .resolved' "$dir/loop/clarify.json" 2>/dev/null || echo 0)"
     echo "- checklist 고칠 항목: $(jq -r .fixable "$dir/loop/checklist.json" 2>/dev/null || echo '?'), 결정 필요: $(jq -r .decision "$dir/loop/checklist.json" 2>/dev/null || echo '?') ($dir/checklists/testability.md)"
-    echo "- 기존 스펙과 모순: $(jq -r .contradictions "$dir/loop/conflicts.json" 2>/dev/null || echo '?'), 의도된 대체: $(jq -r .replacements "$dir/loop/conflicts.json" 2>/dev/null || echo '?') ($dir/conflicts.md)"
+    echo "- 기존 스펙과 모순: $(jq -r .contradictions "$dir/loop/conflicts.json" 2>/dev/null || echo '?'), 의도된 대체: $(jq -r .replacements "$dir/loop/conflicts.json" 2>/dev/null || echo '?'), 결정 필요: $(jq -r '.decisions // 0' "$dir/loop/conflicts.json" 2>/dev/null || echo '?') ($dir/conflicts.md)"
     echo
     echo "## 고르기"
     echo
@@ -157,8 +159,11 @@ check_analyze() {
 
 # B4-1 뒤: 시그니처 파일이 컴파일되는가.
 check_model() {
-  local log
+  local log open
   log="$(loop_dir)/model.log"
+  # 아무 파일도 만들지 않아도 컴파일은 통과하므로 Phase 1 작업이 모두 체크됐는지 먼저 본다.
+  open="$(count_open_tasks 1 "$(feature_dir)/tasks.md")"
+  [[ "$open" == 0 ]] || halt "B4-1 모델링이 끝나지 않았습니다(Phase 1 미완료 작업 ${open}개)" "model 단계 출력(workflow 실행 상태의 stdout)에서 멈춘 이유를 확인합니다."
   if pnpm -s typecheck >"$log" 2>&1 && (cd src-tauri && cargo check --quiet --tests) >>"$log" 2>&1; then
     emit '{"compiles": true}'
   else

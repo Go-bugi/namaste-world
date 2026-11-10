@@ -87,6 +87,7 @@ SPEC
     ;;
   analyze-fix) [[ "$scenario" == analyze-stalled ]] || bump "$F/plan.md" ;;
   model)
+    sed -i.bak 's/- \[ \] T001/- [x] T001/' "$F/tasks.md" && rm -f "$F/tasks.md.bak"
     mkdir -p src/demo
     echo "export const demo = (): number => { throw new Error('not implemented') }" >src/demo/demo.ts
     ;;

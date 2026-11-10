@@ -37,6 +37,18 @@ count_lines() {
   grep -cE "$pattern" "$file" || true
 }
 
+# tasks.md의 "## Phase N" 절에서 체크하지 않은 작업 수. 절이 없으면 0.
+count_open_tasks() {
+  local phase="$1" file="$2"
+  [[ -f "$file" ]] || { echo 0; return; }
+  awk -v p="^## Phase ${phase}([: ]|$)" '
+    $0 ~ p { inside = 1; next }
+    /^## / { inside = 0 }
+    inside && /^- \[ \]/ { n++ }
+    END { print n + 0 }
+  ' "$file"
+}
+
 # "COUNTS: a=1 b=2" 줄에서 key 값을 꺼낸다. 없으면 빈 문자열.
 parse_count() {
   local key="$1" file="$2"

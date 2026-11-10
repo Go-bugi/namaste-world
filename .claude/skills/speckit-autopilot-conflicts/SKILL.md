@@ -29,6 +29,7 @@ $ARGUMENTS
 - [모순] FR-NEW-002 vs FR-OLD-005 (memory): <어떻게 어긋나는지 한 줄>
 - [대체] FR-NEW-003 → FR-OLD-001 (memory): spec이 대체를 밝혔음
 - [모순] FR-NEW-004 vs constitution II: <어긋나는 이유>
+- [결정] Domain NEW: constitution 도메인 코드 표에 없음. GATE-1에서 표에 추가할지 정함
 
 ## 확인한 범위
 - <읽은 파일과, 비교한 memory 항목 수>
@@ -36,6 +37,7 @@ $ARGUMENTS
 
 - spec 본문이 "FR-XXX를 대체"처럼 대체를 밝힌 경우만 `[대체]`로 씁니다. 밝히지 않았으면 `[모순]`입니다.
 - constitution 위반도 `- [모순] ... vs constitution <원칙>` 형식으로 씁니다.
+- constitution이 "GATE-1에서 정한다"고 둔 항목은 `[결정]`으로 씁니다. 예: spec의 `**Domain**:`이 constitution 도메인 코드 표에 없는 경우. spec을 고쳐서 풀 문제가 아니므로 `[모순]`으로 쓰지 않습니다.
 - 모순이 없으면 "기존 요구사항과의 관계" 아래에 `- 없음`이라고 씁니다.
 
 ## 하지 않는 일

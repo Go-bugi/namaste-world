@@ -291,7 +291,7 @@ steps:
     capture: true
     timeout: 900
     input:
-      args: "Phase 1 (Modeling) 작업만 한다. 본문은 TS는 throw new Error('not implemented'), Rust는 todo!()로 둔다. 다른 Phase는 하지 않는다."
+      args: "[autopilot] Phase 1 (Modeling) 작업만 한다. 본문은 TS는 throw new Error('not implemented'), Rust는 todo!()로 둔다. 다른 Phase는 하지 않는다."
 
   - id: model-state
     type: shell
@@ -339,7 +339,7 @@ steps:
         capture: true
         timeout: 1800
         input:
-          args: "Phase 1, 2는 끝났다. 남은 열린 작업을 순서대로 한다. 테스트 파일은 고치지 않는다."
+          args: "[autopilot] Phase 1, 2는 끝났다. 남은 열린 작업을 순서대로 한다. 테스트 파일은 고치지 않는다."
       - id: verify-loop
         type: do-while
         max_iterations: 5
