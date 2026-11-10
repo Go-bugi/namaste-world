@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 // Tauri CLI가 beforeDevCommand / beforeBuildCommand를 실행할 때 넣어 주는 환경 변수
@@ -37,5 +37,12 @@ export default defineConfig(({ command }) => ({
     target: platform === 'windows' ? 'chrome105' : 'safari13',
     minify: isDebug ? false : 'esbuild',
     sourcemap: isDebug,
+  },
+  // Vitest: 경로는 root(src/renderer) 기준. 테스트 파일은 소스 옆에 *.test.ts(x)로 둔다
+  test: {
+    include: ['src/**/*.test.{ts,tsx}'],
+    environment: 'node',
+    // 아직 테스트가 없어도 CI가 실패하지 않게 한다
+    passWithNoTests: true,
   },
 }));

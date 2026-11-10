@@ -10,3 +10,4 @@ LICENSE.md
 build/*.plist
 CHANGELOG.md
 .agents
+src/renderer/src/types/bindings

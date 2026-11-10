@@ -8,7 +8,7 @@ function isRecord(value: unknown): value is AnyRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// leva 스키마에서 기본값을 꺼낸다. folder()는 펼치고, button()은 값이 없으므로 건너뛴다.
+/** leva 스키마에서 기본값을 꺼낸다. folder()는 펼치고, button()은 값이 없으므로 건너뛴다. */
 function defaultsOf(schema: AnyRecord, out: AnyRecord = {}): AnyRecord {
   for (const [key, input] of Object.entries(schema)) {
     if (isRecord(input) && isRecord(input.schema)) {

@@ -45,16 +45,17 @@ pnpm dev
 ```
 src/
   renderer/          React 앱
-    src/api.ts       Rust 명령을 invoke로 감싼 함수 모음
+    src/api/         Rust 명령을 invoke로 감싼 함수 모음
 src-tauri/
-  src/lib.rs         앱 진입점, Rust 명령(#[tauri::command])
+  src/lib.rs         앱 진입점. Builder 조립
+  src/commands/      Rust 명령(#[tauri::command])
   capabilities/      renderer에 허용할 권한
   icons/             앱 아이콘 (pnpm tauri icon <png>로 다시 생성)
   tauri.conf.json    창, 보안(CSP), 번들 설정
 vite.config.ts
 ```
 
-- renderer는 OS에 직접 접근할 수 없습니다. 필요한 기능은 `src-tauri/src/lib.rs`에 명령으로 만들고 `src/renderer/src/api.ts`의 `api`에 추가하세요. 플러그인을 쓰면 `capabilities/default.json`에 권한을 추가해야 합니다.
+- renderer는 OS에 직접 접근할 수 없습니다. 필요한 기능은 `src-tauri/src/commands/`에 명령으로 만들고 `src/renderer/src/api/`의 `api`에 추가하세요. 플러그인을 쓰면 그 창의 capability 파일(`capabilities/main.json` 등)에 권한을 추가해야 합니다.
 - 앱 버전은 `package.json`의 `version`을 그대로 씁니다. `src-tauri/Cargo.toml`의 버전은 `0.0.0`으로 고정되어 있습니다.
 
 ## 디버깅

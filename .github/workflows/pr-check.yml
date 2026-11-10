@@ -71,6 +71,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run format:check
       - run: pnpm run lint
+      - run: pnpm run test
       - run: pnpm run build
 
       # Tauri(Rust) 쪽 검사. 컴파일에 webkit2gtk 등 Linux 시스템 라이브러리가 필요하다.
@@ -87,3 +88,4 @@ jobs:
           workspaces: src-tauri -> target
       - run: pnpm run format:check:rust
       - run: pnpm run lint:rust
+      - run: pnpm run test:rust

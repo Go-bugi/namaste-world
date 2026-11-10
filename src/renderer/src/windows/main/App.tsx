@@ -1,13 +1,18 @@
 import { lazy, Suspense } from 'react';
-import Versions from './components/Versions';
-import logo from './assets/logo.png';
-import { api } from './api';
+import Versions from '@renderer/features/versions/Versions';
+import logo from '@renderer/assets/logo.png';
+import { api } from '@renderer/api';
 
 // three가 커서 첫 화면 번들과 분리한다
-const DemoScene = lazy(() => import('./components/DemoScene'));
+const DemoScene = lazy(() => import('@renderer/scene/DemoScene'));
 
 function App(): React.JSX.Element {
-  const ipcHandle = (): void => void api.ping();
+  const ipcHandle = (): void => {
+    void api.ping().match(
+      () => undefined,
+      (e) => console.error('ping 실패', e),
+    );
+  };
 
   return (
     <>
