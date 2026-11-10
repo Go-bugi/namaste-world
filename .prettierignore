@@ -14,3 +14,5 @@ src/renderer/src/types/bindings
 # spec-kit이 만들고 관리하는 파일 (archive가 memory를 다시 쓰고, CLI가 스킬을 갱신함)
 .specify
 .claude/skills/speckit-*
+# spec-kit에 설치하는 원본. 설치본(.specify/)과 바이트까지 같아야 registry 해시가 맞는다
+.specify-src

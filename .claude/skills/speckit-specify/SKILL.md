@@ -1,15 +1,17 @@
 ---
-name: "speckit-specify"
-description: "Create or update the feature specification from a natural language feature description."
+name: speckit-specify
+description: Create or update the feature specification from a natural language feature
+  description.
 argument-hint: "Describe the feature you want to specify"
-compatibility: "Requires spec-kit project structure with .specify/ directory"
+compatibility: Requires spec-kit project structure with .specify/ directory
 metadata:
-  author: "github-spec-kit"
-  source: "templates/commands/specify.md"
+  author: github-spec-kit
+  source: preset:namaste
 user-invocable: true
 disable-model-invocation: false
 ---
 
+# Speckit Specify Skill
 
 ## User Input
 
@@ -346,3 +348,15 @@ Success criteria must be:
 - [ ] Specification written to `SPEC_FILE` and validated against quality checklist
 - [ ] Extension hooks dispatched or skipped according to the rules in Mandatory Post-Execution Hooks above
 - [ ] Completion reported to user with feature directory, spec file path, and checklist results
+
+
+## namaste 저장소 규칙 (preset 보강)
+
+위 절차에 아래를 더합니다. 위 절차와 어긋나면 아래를 따릅니다.
+
+1. **기존 스펙 먼저 읽기**: spec을 쓰기 전에 `.specify/memory/constitution.md`의 "Spec Conventions"를 읽습니다. 이번 기능 디렉터리에 `context.md`가 있으면 그것을, 없으면 `.specify/memory/spec.md`에서 관련 도메인 절을 읽습니다.
+2. **Domain과 Touches 채우기**: `**Domain**:`에 constitution 표의 도메인 코드를 적습니다. 맞는 코드가 없으면 새 코드를 제안하고 `[NEEDS CLARIFICATION: 새 도메인 코드 <코드> 추가 여부]`로 표시합니다. `**Touches**:`에는 기대거나 바꾸는 기존 요구사항 ID를 적습니다.
+3. **기존 요구사항과의 관계**: 기존 요구사항과 반대되는 동작이 필요하면 그 FR 본문에 "FR-XXX-NNN을 대체"처럼 밝힙니다. 몰래 반대로 쓰지 않습니다.
+4. **테스트할 수 있는 문장**: 이 spec만 보고 다른 에이전트가 테스트를 씁니다. 모든 Acceptance Scenario와 FR을 관찰할 수 있는 결과로 끝내고, 정도를 나타내는 말에는 숫자 기준을 붙입니다.
+5. **한국어**: 본문은 한국어로, 섹션 제목과 필드 이름과 ID 접두사는 템플릿의 영어 표기 그대로 씁니다.
+6. **입력 파일**: 사용자 입력이 파일 경로 하나라면 그 파일을 읽어 기능 설명으로 씁니다.
