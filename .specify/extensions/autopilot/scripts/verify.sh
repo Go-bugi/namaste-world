@@ -10,6 +10,9 @@ logs="$loop/verify"
 rm -rf "$logs"
 mkdir -p "$logs"
 
+# 에이전트가 쓴 spec 문서는 format:check 대상이다. 커밋 때 lint-staged가 하는 것과 같은 정리를 미리 해 둔다.
+pnpm -s exec prettier --write --log-level warn "$(feature_dir)" >"$logs/prettier-specs.log" 2>&1 || true
+
 failures=()
 for c in "${CHECKS[@]}"; do
   log="$logs/${c//:/-}.log"

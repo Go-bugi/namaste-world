@@ -16,3 +16,5 @@ src/renderer/src/types/bindings
 .claude/skills/speckit-*
 # spec-kit에 설치하는 원본. 설치본(.specify/)과 바이트까지 같아야 registry 해시가 맞는다
 .specify-src
+# spec-kit autopilot 루프 기록. 테스트 입력 묶음과 snapshot에 소스 사본이 들어 있다
+specs/*/loop
