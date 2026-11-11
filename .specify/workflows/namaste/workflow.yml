@@ -54,7 +54,7 @@ steps:
     command: speckit.autopilot.context
     integration: "{{ inputs.maker }}"
     capture: true
-    timeout: 600
+    timeout: 900
     input:
       args: "{{ inputs.spec }}"
 
@@ -81,7 +81,7 @@ steps:
         command: speckit.autopilot.clarify-ask
         integration: "{{ inputs.maker }}"
         capture: true
-        timeout: 600
+        timeout: 900
       - id: clarify-asked
         type: shell
         output_format: json
@@ -101,7 +101,7 @@ steps:
             command: speckit.autopilot.clarify-apply
             integration: "{{ inputs.maker }}"
             capture: true
-            timeout: 600
+            timeout: 900
       - id: clarify-state
         type: shell
         output_format: json
@@ -117,7 +117,7 @@ steps:
         command: speckit.checklist
         integration: "{{ inputs.maker }}"
         capture: true
-        timeout: 600
+        timeout: 900
         input:
           args: "testability: 이 spec만 보고 다른 사람이 테스트를 쓸 수 있는지 점검한다. 파일 이름은 checklists/testability.md로 하고 이미 있으면 새로 쓴다. 질문하지 말고 바로 만든다. 각 항목에 [Gap], [Ambiguity], [Conflict] 중 해당 표시를 붙인다."
       - id: checklist-state
@@ -132,7 +132,7 @@ steps:
             command: speckit.autopilot.fix
             integration: "{{ inputs.maker }}"
             capture: true
-            timeout: 600
+            timeout: 900
             input:
               args: "checklist"
 
@@ -146,7 +146,7 @@ steps:
         command: speckit.autopilot.conflicts
         integration: "{{ inputs.checker }}"
         capture: true
-        timeout: 600
+        timeout: 900
       - id: conflicts-state
         type: shell
         output_format: json
@@ -159,7 +159,7 @@ steps:
             command: speckit.autopilot.fix
             integration: "{{ inputs.maker }}"
             capture: true
-            timeout: 600
+            timeout: 900
             input:
               args: "conflicts"
 
@@ -188,7 +188,7 @@ steps:
             command: speckit.autopilot.fix
             integration: "{{ inputs.maker }}"
             capture: true
-            timeout: 600
+            timeout: 900
             input:
               args: "gate1"
       - id: gate1-recheck
@@ -199,7 +199,7 @@ steps:
             command: speckit.checklist
             integration: "{{ inputs.maker }}"
             capture: true
-            timeout: 600
+            timeout: 900
             input:
               args: "testability: 이 spec만 보고 다른 사람이 테스트를 쓸 수 있는지 점검한다. 파일 이름은 checklists/testability.md로 하고 이미 있으면 새로 쓴다. 질문하지 말고 바로 만든다. 각 항목에 [Gap], [Ambiguity], [Conflict] 중 해당 표시를 붙인다."
           - id: gate1-checklist-state
@@ -210,7 +210,7 @@ steps:
             command: speckit.autopilot.conflicts
             integration: "{{ inputs.checker }}"
             capture: true
-            timeout: 600
+            timeout: 900
           - id: gate1-conflicts-state
             type: shell
             output_format: json
@@ -242,7 +242,7 @@ steps:
     command: speckit.tasks
     integration: "{{ inputs.maker }}"
     capture: true
-    timeout: 600
+    timeout: 900
 
   - id: tasks-state
     type: shell
