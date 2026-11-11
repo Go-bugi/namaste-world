@@ -221,6 +221,7 @@ changed_tests() {
   while IFS= read -r f; do
     [[ -f "$f" ]] || continue
     case "$f" in
+      specs/*/loop/*) ;; # 입력 묶음과 snapshot에 든 사본
       *.test.ts | *.test.tsx) echo "$f" ;;
       *.rs)
         grep -q '#\[cfg(test)\]' "$f" || continue

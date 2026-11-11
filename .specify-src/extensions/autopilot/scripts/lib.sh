@@ -102,6 +102,7 @@ test_fingerprint() {
 }
 
 # Rust 파일에서 테스트 모듈 앞부분(구현 쪽)의 해시.
+# 테스트 모듈을 덧붙일 때 생기는 끝의 빈 줄은 구현이 아니므로 빼고 해시한다.
 rust_head_hash() {
-  sed '/#\[cfg(test)\]/,$d' "$1" | sha
+  sed '/#\[cfg(test)\]/,$d' "$1" | awk '/^[[:space:]]*$/ { blank = blank $0 "\n"; next } { printf "%s", blank; blank = ""; print }' | sha
 }

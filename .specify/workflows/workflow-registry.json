@@ -14,8 +14,8 @@
       "version": "1.0.0",
       "description": "spec-kit \uc804\uccb4 \ub2e8\uacc4(specify\ubd80\ud130 converge, archive\uae4c\uc9c0)\ub97c \uc0c1\ud55c \uc788\ub294 \ub8e8\ud504\ub85c \uc2e4\ud589\ud55c\ub2e4. \uc0ac\ub78c\uc740 clarify \ub2f5, GATE-1, GATE-2\uc5d0\uc11c\ub9cc \uac1c\uc785\ud55c\ub2e4.",
       "source": ".specify-src/workflows/namaste/workflow.yml",
-      "installed_at": "2026-11-10T23:21:55.187794+00:00",
-      "updated_at": "2026-11-10T23:21:55.187990+00:00"
+      "installed_at": "2026-11-11T03:02:00.314049+00:00",
+      "updated_at": "2026-11-11T03:02:00.314264+00:00"
     }
   }
 }

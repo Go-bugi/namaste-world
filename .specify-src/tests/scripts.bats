@@ -156,6 +156,17 @@ json() { jq -r "$1" <<<"$output"; }
   [ "$(test_fingerprint list.txt)" != "$before" ]
 }
 
+# 테스트 모듈을 빈 줄 하나 띄우고 덧붙여도 구현부 해시는 같음
+@test "rust head hash ignores the blank line before an appended test module" {
+  source $S/lib.sh
+  printf 'fn a() {}\n' >x.rs
+  before="$(rust_head_hash x.rs)"
+  printf '\n#[cfg(test)]\nmod tests {}\n' >>x.rs
+  [ "$(rust_head_hash x.rs)" = "$before" ]
+  printf 'fn a() { 1; }\n\n#[cfg(test)]\nmod tests {}\n' >x.rs
+  [ "$(rust_head_hash x.rs)" != "$before" ]
+}
+
 # audit: 모든 FR에 Source가 있으면 통과
 @test "audit passes when every FR has a source ref" {
   printf -- '- a [Source: %s/spec.md -> FR-DEMO-001]\n- b [Source: %s/spec.md -> FR-DEMO-002]\n' "$F" "$F" >>.specify/memory/spec.md
