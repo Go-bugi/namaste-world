@@ -48,3 +48,10 @@ ehthumbs.db
 
 # 에이전트 로컬 상태 (oh-my-claudecode)
 .omc/
+
+# spec-kit workflow 실행 상태 (run ID별 진행 기록. 실행한 사람의 로컬 상태)
+.specify/workflows/runs/
+# 확장 카탈로그 캐시
+.specify/extensions/.cache/
+# autopilot 루프가 한 번 실행하는 동안 쓰는 임시 파일
+.specify/autopilot/

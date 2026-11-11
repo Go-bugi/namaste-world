@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# pnpm 대역. 시나리오에 따라 검사 성공과 실패를 정한다. 호출은 .fixture/pnpm에 남긴다.
+[[ "${1:-}" == "-s" ]] && shift
+cmd="${1:-}"
+mkdir -p .fixture
+echo "$cmd" >>.fixture/pnpm
+scenario="${SCENARIO:-happy}"
+impl_done=false
+grep -q 'number => 1' src/demo/demo.ts 2>/dev/null && impl_done=true
+case "$cmd" in
+  test)
+    [[ "$scenario" == tests-never-red ]] && exit 0
+    case "$scenario" in verify-forever | verify-stalled | tamper)
+      [[ "$impl_done" == true ]] && { echo "FAIL demo.test.ts: expected 2 got 1 ($(wc -l <src/demo/demo.ts))"; exit 1; } ;;
+    esac
+    [[ "$impl_done" == true ]] && exit 0
+    echo "FAIL demo.test.ts: not implemented"; exit 1 ;;
+  *) exit 0 ;;
+esac

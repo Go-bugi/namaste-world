@@ -13,6 +13,7 @@ pnpm format:check     # Prettier 검사 (format으로 자동 수정)
 pnpm format:check:rust # rustfmt 검사 (format:rust로 자동 수정)
 pnpm test             # Vitest 한 번 실행 (test:watch는 watch 모드)
 pnpm test:rust        # cargo test
+pnpm speckit:check     # spec-kit autopilot 스크립트와 루프 검사 (bats)
 pnpm build            # typecheck 후 renderer만 out/renderer에 빌드
 pnpm build:unpack     # 설치 파일 없이 앱 실행 파일만 빌드 (src-tauri/target/release/)
 pnpm build:mac        # dmg 패키징. build:win은 nsis 설치 파일, build:win:arm64는 Windows ARM용 nsis 설치 파일
@@ -174,6 +175,21 @@ renderer와 주고받는 타입은 Rust에 정의하고 [ts-rs](https://github.c
 - **`release/x.y.0` → `main` PR은 정식 버전 Release PR을 머지한 뒤에 엽니다.** 제목은 `Release x.y.0`처럼 Conventional Commits 형식이 아니게 씁니다. 그래야 main CHANGELOG에 중복 기록되지 않습니다.
 - `develop`에는 바로 나가도 되는 코드만 머지합니다. 큰 기능은 사용자에게 보이는 연결(버튼, 메뉴, 라우트)을 마지막 PR로 분리합니다.
 
+## spec-kit
+
+기능은 spec-kit autopilot 루프(`scripts/speckit-run.sh`)나 `speckit-*` 명령으로 만듭니다. 사람이 읽는 사용법은 README의 "spec-kit으로 기능 만들기"에 있고, 여기에는 에이전트가 지킬 규칙만 적습니다.
+
+- **기존 스펙 먼저**: 새 기능의 spec을 쓰기 전에 `.specify/memory/spec.md`, `plan.md`에서 관련 요구사항을 읽습니다. memory가 "구현된 기능의 스펙"의 기준입니다. `.specify/memory/constitution.md`의 원칙과 스펙 작성 규칙(도메인 코드, `FR-<도메인>-NNN`)을 따릅니다.
+- **memory는 archive만 고칩니다**: `.specify/memory/spec.md`, `plan.md`, `changelog.md`를 손으로 고치지 않습니다. 기능을 머지하기 전에 `/speckit-archive-run specs/<기능>`으로 합칩니다.
+- **루프 안의 규칙**: 명령 인자가 `[autopilot]`으로 시작하거나 `speckit-autopilot-*` 명령으로 실행되면 autopilot 루프의 한 단계입니다. 이때는 아래를 지킵니다.
+  - 사용자에게 질문하지 않고 결과를 파일로 남깁니다.
+  - 명령 절차에 있는 확장 훅(memory-loader, reconcile 등)을 실행하지 않습니다. 기존 스펙은 기능 디렉터리의 `context.md`로 봅니다. reconcile은 GATE-2에서 사람이 실행합니다.
+  - autopilot의 판정 스크립트와 루프 정의(`.specify/extensions/autopilot/`, `.specify-src/`, `scripts/speckit-*.sh`, `.specify/workflows/`)를 읽거나 실행하지 않습니다. 결과는 루프가 따로 판정합니다. 명령 절차가 부르는 core 스크립트(`.specify/scripts/`)는 그대로 씁니다.
+  - `humanizer`를 부르지 않습니다. 한국어 문장은 `korean-tech-writing`으로 쓰고, AI 말투 점검은 GATE-1, GATE-2 직전의 `speckit-autopilot-polish` 단계에서만 합니다.
+  - 테스트 파일(`*.test.ts(x)`, Rust의 `#[cfg(test)] mod tests`)은 `test-writer` 서브에이전트만 쓰고, 구현 쪽은 고치지 않습니다.
+  - 커밋, push, 브랜치 이동은 하지 않습니다.
+- **설치본은 고치지 않습니다**: `.specify/`, `.claude/skills/speckit-*`, `.agents/skills/speckit-*`는 spec-kit이 만든 파일입니다. preset, autopilot 확장, workflow는 `.specify-src/`에서 고치고 `scripts/speckit-setup.sh --rebuild`로 다시 설치한 뒤 `pnpm speckit:check`를 돌립니다. `.specify-src/`와 설치본은 바이트까지 같아야 해서 Prettier 대상에서 뺐습니다.
+
 ## 스킬
 
 반복 작업의 절차는 `.agents/skills/<이름>/SKILL.md`에 있습니다. 해당 작업을 할 때는 먼저 그 파일을 읽고 따르세요. 스킬을 불러오는 기능이 있는 에이전트는 그 기능으로 불러와도 됩니다. SKILL.md 안의 경로는 스킬 폴더 밖의 파일이면 저장소 루트 기준이고, 같은 스킬의 `references/` 같은 파일이면 그 스킬 폴더 기준입니다.
@@ -191,8 +207,9 @@ renderer와 주고받는 타입은 Rust에 정의하고 [ts-rs](https://github.c
 | `zustand-state-management`    | `code-writer`가 store 작업에서 부릅니다. 코드를 바꾸지 않는 질문에는 바로 씁니다. R3F에서 쓸 때는 아래 규칙을 함께 지킵니다                                                                                                            |
 | `vercel-react-best-practices` | `code-writer`가 React 작업에서 부릅니다. 코드를 바꾸지 않는 리뷰와 질문에는 바로 씁니다. Next.js, RSC, SSR 규칙은 이 앱에 해당하지 않습니다                                                                                            |
 | `fp-apply`                    | `code-writer`가 로직 작업에서 부릅니다. 코드를 바꾸지 않는 설계 질문과 함수형 리뷰에는 바로 씁니다. 계산 규칙은 순수 함수로 두고, 사이드 이펙트는 이벤트 핸들러, `Effect`, store action, `useFrame`, `api/`, Rust 명령 쪽으로 나눕니다 |
+| `speckit-*`                   | spec-kit 단계 명령(`speckit-specify`, `speckit-plan` 등)과 확장 명령(`speckit-archive-run`, `speckit-autopilot-*`). 루프 밖에서 단계를 직접 실행할 때 씁니다. 위 "spec-kit" 규칙을 함께 지킵니다                                       |
 
-- 스킬 원본은 `.agents/skills/` 한 곳에만 둡니다. 에이전트별 스킬 폴더(예: `.claude/skills/`)에는 원본을 가리키는 스킬별 심링크만 둡니다. 스킬을 추가하거나 고칠 때도 `.agents/skills/`에서 작업합니다.
+- 스킬 원본은 `.agents/skills/` 한 곳에만 둡니다. 에이전트별 스킬 폴더(예: `.claude/skills/`)에는 원본을 가리키는 스킬별 심링크만 둡니다. 스킬을 추가하거나 고칠 때도 `.agents/skills/`에서 작업합니다. 예외는 `speckit-*`입니다. spec-kit이 Claude용(`.claude/skills/`)과 Codex용(`.agents/skills/`)을 따로 만들고, 둘은 명령 호출 표기(`/speckit-`, `$speckit-`)가 달라 심링크로 합칠 수 없습니다.
 - `.agents`는 `.prettierignore`와 ESLint `ignores`에 들어 있습니다. 외부에서 가져온 스킬을 원본 그대로 두기 위해서입니다.
 - `threejs-*` 13개는 [CloudAI-X/threejs-skills](https://github.com/CloudAI-X/threejs-skills)(MIT)를 그대로 가져온 것입니다. 갱신할 때도 원본을 덮어쓰고 직접 고치지 않습니다.
 - **3D 작업의 CSP 제약**: CSP가 외부 주소를 막으므로 에셋과 디코더는 앱 안(`'self'`)에서만 불러옵니다. drei `Environment`의 `preset`(외부 HDR)은 쓰지 말고 `files`에 앱 안의 HDR 파일을 넘깁니다. `useGLTF`의 기본 Draco 디코더도 gstatic에서 받아 오므로, Draco 모델을 쓸 때는 디코더를 앱에 넣고 `useGLTF.setDecoderPath`로 그 경로를 가리킵니다.
