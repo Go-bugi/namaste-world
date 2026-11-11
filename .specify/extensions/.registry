@@ -16,7 +16,7 @@
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-11-11T08:03:44.100278+00:00"
+      "installed_at": "2026-11-11T08:17:11.142013+00:00"
     },
     "reconcile": {
       "version": "1.3.1",
@@ -33,7 +33,7 @@
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-11-11T08:03:47.369690+00:00"
+      "installed_at": "2026-11-11T08:17:14.548146+00:00"
     },
     "memory-loader": {
       "version": "1.0.0",
@@ -50,12 +50,12 @@
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-11-11T08:03:50.812861+00:00"
+      "installed_at": "2026-11-11T08:17:17.707870+00:00"
     },
     "autopilot": {
       "version": "1.0.0",
       "source": "local",
-      "manifest_hash": "sha256:e038b94bd54f689f47e32bd2b4dd6fd70873b2b91edd6632976bce9037cab8a7",
+      "manifest_hash": "sha256:de0183572357dc29cda936793b86b8c4498eb9f54a99df0ceb9369eda615f82d",
       "enabled": true,
       "priority": 10,
       "registered_commands": {
@@ -67,7 +67,8 @@
           "speckit.autopilot.fix",
           "speckit.autopilot.analyze",
           "speckit.autopilot.test-write",
-          "speckit.autopilot.review"
+          "speckit.autopilot.review",
+          "speckit.autopilot.polish"
         ],
         "codex": [
           "speckit.autopilot.context",
@@ -77,11 +78,12 @@
           "speckit.autopilot.fix",
           "speckit.autopilot.analyze",
           "speckit.autopilot.test-write",
-          "speckit.autopilot.review"
+          "speckit.autopilot.review",
+          "speckit.autopilot.polish"
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-11-11T08:03:53.583672+00:00"
+      "installed_at": "2026-11-11T08:17:20.339219+00:00"
     }
   }
 }

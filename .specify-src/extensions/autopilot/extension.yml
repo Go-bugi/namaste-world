@@ -38,6 +38,9 @@ provides:
     - name: "speckit.autopilot.review"
       file: "commands/speckit.autopilot.review.md"
       description: "B6: code-writer 7단계 리뷰 결과를 loop/review.md에 쓴다"
+    - name: "speckit.autopilot.polish"
+      file: "commands/speckit.autopilot.polish.md"
+      description: "GATE-1, GATE-2 직전에 spec과 plan의 문장을 humanizer로 다듬는다"
 
 tags:
   - "workflow"

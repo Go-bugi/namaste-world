@@ -181,7 +181,13 @@ renderer와 주고받는 타입은 Rust에 정의하고 [ts-rs](https://github.c
 
 - **기존 스펙 먼저**: 새 기능의 spec을 쓰기 전에 `.specify/memory/spec.md`, `plan.md`에서 관련 요구사항을 읽습니다. memory가 "구현된 기능의 스펙"의 기준입니다. `.specify/memory/constitution.md`의 원칙과 스펙 작성 규칙(도메인 코드, `FR-<도메인>-NNN`)을 따릅니다.
 - **memory는 archive만 고칩니다**: `.specify/memory/spec.md`, `plan.md`, `changelog.md`를 손으로 고치지 않습니다. 기능을 머지하기 전에 `/speckit-archive-run specs/<기능>`으로 합칩니다.
-- **루프 안의 규칙**: autopilot 단계로 실행될 때는 사용자에게 질문하지 않고 결과를 파일로 남깁니다. 테스트 파일(`*.test.ts(x)`, Rust의 `#[cfg(test)] mod tests`)은 `test-writer` 서브에이전트만 쓰고, 구현 쪽은 고치지 않습니다. 커밋, push, 브랜치 이동은 하지 않습니다.
+- **루프 안의 규칙**: 명령 인자가 `[autopilot]`으로 시작하거나 `speckit-autopilot-*` 명령으로 실행되면 autopilot 루프의 한 단계입니다. 이때는 아래를 지킵니다.
+  - 사용자에게 질문하지 않고 결과를 파일로 남깁니다.
+  - 명령 절차에 있는 확장 훅(memory-loader, reconcile 등)을 실행하지 않습니다. 기존 스펙은 기능 디렉터리의 `context.md`로 봅니다. reconcile은 GATE-2에서 사람이 실행합니다.
+  - autopilot의 판정 스크립트와 루프 정의(`.specify/extensions/autopilot/`, `.specify-src/`, `scripts/speckit-*.sh`, `.specify/workflows/`)를 읽거나 실행하지 않습니다. 결과는 루프가 따로 판정합니다. 명령 절차가 부르는 core 스크립트(`.specify/scripts/`)는 그대로 씁니다.
+  - `humanizer`를 부르지 않습니다. 한국어 문장은 `korean-tech-writing`으로 쓰고, AI 말투 점검은 GATE-1, GATE-2 직전의 `speckit-autopilot-polish` 단계에서만 합니다.
+  - 테스트 파일(`*.test.ts(x)`, Rust의 `#[cfg(test)] mod tests`)은 `test-writer` 서브에이전트만 쓰고, 구현 쪽은 고치지 않습니다.
+  - 커밋, push, 브랜치 이동은 하지 않습니다.
 - **설치본은 고치지 않습니다**: `.specify/`, `.claude/skills/speckit-*`, `.agents/skills/speckit-*`는 spec-kit이 만든 파일입니다. preset, autopilot 확장, workflow는 `.specify-src/`에서 고치고 `scripts/speckit-setup.sh --rebuild`로 다시 설치한 뒤 `pnpm speckit:check`를 돌립니다. `.specify-src/`와 설치본은 바이트까지 같아야 해서 Prettier 대상에서 뺐습니다.
 
 ## 스킬

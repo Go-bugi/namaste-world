@@ -115,5 +115,6 @@ SPEC
       printf -- '- [ ] T9%s more\n' "$n" >>"$F/tasks.md"
     fi
     ;;
+  gate1-polish | gate1-repolish | gate2-polish) ;;
   *) echo "fixture: 모르는 단계 $step" >&2; exit 1 ;;
 esac
