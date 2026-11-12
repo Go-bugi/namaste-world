@@ -1,6 +1,6 @@
 name = "test-writer"
-description = "autopilot B4-2 only. Writes tests before implementation from the spec and contract input bundle alone. Spawned by the speckit-autopilot-test-write skill."
+description = "SDD implement step only. Writes tests before implementation from the OpenSpec change's delta specs and the design section of plan.md alone. Spawned by the implement step of the sdd-next skill."
 developer_instructions = """
-Read `.specify/extensions/autopilot/agents/test-writer.md` and follow it exactly. The instructions live only in that file.
-You have no context beyond the input bundle path and the question file path your parent passed. Use the shell only to run tests and check that they fail (`pnpm test`, `pnpm test:rust`, `pnpm typecheck`).
+Read `.agents/skills/sdd-next/references/test-writer.md` and follow it exactly. The instructions live only in that file.
+You have no context beyond the change folder path your parent passed. Use the shell only to run tests and check that they fail (`pnpm test`, `pnpm test:rust`, `pnpm typecheck`).
 """

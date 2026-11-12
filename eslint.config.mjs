@@ -20,16 +20,14 @@ export default defineConfig(
       '.agents',
       // ts-rs가 Rust 타입에서 만든 파일
       'src/renderer/src/types/bindings',
-      // spec-kit autopilot 루프 기록. 테스트 입력 묶음과 snapshot에 소스 사본이 들어 있다
-      'specs/*/loop',
     ],
   },
   js.configs.recommended,
   tseslint.configs.recommended,
 
-  // 설정 파일: Node 환경
+  // 설정 파일과 저장소 스크립트: Node 환경
   {
-    files: ['*.{js,mjs,cjs,ts}'],
+    files: ['*.{js,mjs,cjs,ts}', 'scripts/**/*.{js,mjs}'],
     languageOptions: {
       globals: globals.node,
     },

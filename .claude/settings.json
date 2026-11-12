@@ -2,8 +2,12 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
-      "Bash(.specify/scripts/bash/*)",
-      "Bash(bash .specify/scripts/bash/*)",
+      "Bash(node scripts/sdd-state.mjs*)",
+      "Bash(OPENSPEC_TELEMETRY=0 pnpm exec openspec status*)",
+      "Bash(OPENSPEC_TELEMETRY=0 pnpm exec openspec instructions*)",
+      "Bash(OPENSPEC_TELEMETRY=0 pnpm exec openspec validate*)",
+      "Bash(OPENSPEC_TELEMETRY=0 pnpm exec openspec list*)",
+      "Bash(OPENSPEC_TELEMETRY=0 pnpm exec openspec show*)",
       "Bash(pnpm typecheck*)",
       "Bash(pnpm test*)",
       "Bash(pnpm lint*)",

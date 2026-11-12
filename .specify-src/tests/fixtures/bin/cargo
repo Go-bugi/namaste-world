@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# cargo 대역. 이 픽스처에는 Rust 코드가 없으므로 항상 성공한다.
-exit 0
