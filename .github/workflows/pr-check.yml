@@ -90,11 +90,12 @@ jobs:
       - run: pnpm run lint:rust
       - run: pnpm run test:rust
 
-  # spec-kit autopilot 루프 검사. 판정 스크립트 단위 테스트와, 실제 workflow.yml의 에이전트 단계를
-  # 픽스처로 바꿔 모든 루프가 상한에서 멈추는지 확인한다(에이전트는 호출하지 않는다).
-  speckit:
+  # SDD 검사. 상태 판정 스크립트 단위 테스트와 OpenSpec schema, 기준 스펙, 진행 중인 변경의 형식을 본다.
+  sdd:
     if: github.event.action != 'edited'
     runs-on: ubuntu-latest
+    env:
+      OPENSPEC_TELEMETRY: '0'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -103,8 +104,6 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: astral-sh/setup-uv@v6
-      # scripts/speckit-setup.sh의 SPECKIT_VERSION과 같게 둔다
-      - run: uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@v1.2.3
-      - run: git config --global user.email ci@example.com && git config --global user.name ci
-      - run: pnpm run speckit:check
+      - run: pnpm run sdd:check
+      - run: pnpm exec openspec schema validate namaste
+      - run: pnpm exec openspec validate --all --strict
