@@ -37,6 +37,8 @@ pnpm dev
 | `pnpm lint` / `format`           | ESLint / Prettier                                           |
 | `pnpm lint:rust` / `format:rust` | Clippy / rustfmt                                            |
 | `pnpm typecheck`                 | `vite.config.ts`(node)와 renderer(web) 각각 타입체크        |
+| `pnpm test` / `test:rust`        | Vitest / `cargo test`                                       |
+| `pnpm sdd:check`                 | SDD 상태 판정 스크립트 테스트                               |
 
 결과물은 `src-tauri/target/release/bundle/`(다른 target을 지정하면 `src-tauri/target/<target>/release/bundle/`)에 생성됩니다.
 
@@ -80,116 +82,55 @@ vite.config.ts
 
 - husky 훅은 Git for Windows에 포함된 sh로 실행됩니다. GUI Git 클라이언트를 쓴다면 `pnpm`이 PATH에 있어야 합니다.
 
-## spec-kit으로 기능 만들기
+## 스펙부터 쓰고 기능 만들기
 
-기능은 [spec-kit](https://github.com/github/spec-kit)으로 만듭니다. 스펙 작성부터 구현, 검증, 기존 스펙과의 병합까지를 autopilot 루프 하나로 돌립니다. 사람은 세 곳에서만 개입합니다. clarify 질문에 답하고, 스펙을 승인하고(GATE-1), 마지막에 병합을 확인합니다(GATE-2).
+기능은 [OpenSpec](https://github.com/Fission-AI/OpenSpec)으로 스펙을 먼저 쓰고 만듭니다. 사람은 다음 단계가 무엇인지 몰라도 됩니다. **`sdd-next` 하나만 반복해서 부르면** 스크립트가 지금 상태를 판정하고 에이전트가 그 상태에서 할 일 하나만 합니다.
 
 ### 처음 설정
 
-```bash
-scripts/speckit-setup.sh
-```
-
-- `uv`, `jq`, 그리고 Claude Code(`claude`)나 Codex(`codex`) CLI 중 하나 이상이 필요합니다.
-- spec-kit 설정(`.specify/`, 스킬, preset, 확장, workflow)은 저장소에 커밋되어 있습니다. 이 스크립트는 `specify-cli`를 고정 버전으로 설치하고 설정이 맞는지 점검합니다.
-- spec-kit이나 확장 버전을 올릴 때는 `--rebuild`로 다시 설치합니다.
-- 루프 없이 `/speckit-*` 명령을 직접 쓰려면 스크립트가 마지막에 알려 주는 `SPECKIT_PYTHON_EXECUTABLE`을 셸 설정에 넣습니다. spec-kit 스크립트가 preset 템플릿을 고를 때 PyYAML이 있는 파이썬이 필요합니다.
+`pnpm install`이면 됩니다. OpenSpec CLI는 `devDependencies`에 버전을 고정해 두었고, 설정(`openspec/`)과 스킬(`sdd-next`)은 저장소에 커밋되어 있습니다. Claude Code와 Codex 모두 같은 스킬을 씁니다.
 
 ### 기능 하나 만들기
 
 ```bash
 git switch -c feature/tray-version
-scripts/speckit-run.sh \
-  --spec "트레이 메뉴에 앱 버전을 보여 준다. 사용자가 지금 쓰는 버전을 바로 확인할 수 있게 한다." \
-  --plan "버전은 package.json 값을 Rust에서 읽어 트레이 메뉴 맨 아래 비활성 항목으로 넣는다."
 ```
 
-| 옵션                                        | 넘어가는 곳                                        | 필수                                                  |
-| ------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------- |
-| `--spec "<설명>"` 또는 `--spec-file <경로>` | specify. 무엇을, 왜 만드는지. 여러 줄도 됩니다     | 둘 중 하나                                            |
-| `--plan "<설명>"` 또는 `--plan-file <경로>` | plan. 기술 방향                                    | 아니요. 생략하면 plan 단계가 정합니다                 |
-| `--maker claude\|codex`                     | 만드는 쪽(specify, plan, tasks, implement, 수정)   | 아니요. 기본 `claude`                                 |
-| `--checker claude\|codex`                   | 검사하는 쪽(충돌 검사, analyze, 테스트 작성, 리뷰) | 아니요. 기본은 maker가 아닌 쪽, 그 CLI가 없으면 maker |
+Claude Code에서는 `/sdd-next`, Codex에서는 `$sdd-next`를 부르고 무엇을 왜 만들지 말합니다. 그다음부터는 같은 스킬을 다시 부르기만 합니다. 스킬은 부를 때마다 한 단계를 진행하고 다음에 무엇을 할지 알려 줍니다.
 
-시작 조건은 `feature/*` 브랜치, 깨끗한 작업 트리입니다.
+| 상태      | 에이전트가 하는 일                                                                               | 사람이 할 일                       |
+| --------- | ------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| proposal  | 왜 바꾸는지, 무엇이 바뀌는지, 영향 범위를 `proposal.md`에 씁니다                                 | 무엇을 왜 만들지 말합니다          |
+| specs     | 해야 할 동작을 요구사항(`FR-`, `SC-`)과 시나리오로 씁니다                                        |                                    |
+| clarify   | 기존 스펙, 진행 중인 다른 변경과 충돌하는 곳과 모호한 곳을 질문합니다(라운드마다 5개까지)        | 질문에 답합니다                    |
+| plan      | 설계(층 배치, 타입, 시그니처)와 작업 체크리스트를 `plan.md`에 씁니다                             |                                    |
+| approval  | 읽을 파일을 보여 주고 승인 여부를 묻습니다                                                       | 읽고 승인하거나 고칠 점을 말합니다 |
+| implement | `test-writer`가 테스트를 먼저 쓰고, 이어서 체크리스트를 하나씩 구현합니다                        | test-writer의 질문에 답합니다      |
+| verify    | PR CI와 같은 명령을 돌려 완료를 판정합니다. 실패하면 수정 작업을 추가하고 implement로 돌아갑니다 |                                    |
+| archive   | delta를 `openspec/specs/`에 합치고 변경 폴더를 `openspec/changes/archive/`로 옮깁니다            |                                    |
 
-### 실행 중 사람이 할 일
-
-| 시점    | 화면                              | 할 일                                                                                                                                                                                   |
-| ------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| clarify | `specs/<기능>/clarify/round-N.md` | 질문마다 `**답**:` 뒤에 답을 적고 `answered`를 고릅니다. 비워 둔 질문은 넘어갑니다. 최대 3라운드입니다                                                                                  |
-| GATE-1  | `specs/<기능>/loop/gate1.md`      | `approve`는 승인, `edit`는 `spec.md`를 직접 고친 뒤 다시 검사, `reject`는 `loop/gate1-feedback.md`에 고칠 점을 적은 뒤 에이전트가 고치게 합니다. `edit`와 `reject`는 합쳐 3번까지입니다 |
-| GATE-2  | 터미널 안내                       | 자기 에이전트에서 `/speckit-reconcile-run specs/<기능>`과 `/speckit-archive-run specs/<기능>`을 대화형으로 실행하고(Codex는 `$speckit-...`), 질문에 답한 뒤 `done`을 고릅니다           |
-
-archive는 기존 요구사항을 지우거나 바꿀 때 대화 중에 확인을 받습니다. 그래서 루프가 대신 실행하지 않고 사람이 GATE-2에서 직접 실행합니다.
-
-터미널이 아닌 곳에서 실행하면 gate에서 멈춥니다. 답을 정한 뒤 이어서 실행합니다.
-
-```bash
-scripts/speckit-run.sh --resume <run_id> --gate1 approve
-```
-
-### 흐름 한눈에 보기
-
-```mermaid
-flowchart TD
-  A[A1 맥락 읽기, A2 specify] --> B[A3 clarify<br/>최대 3라운드]
-  B --> C[A4 checklist, A5 충돌 검사<br/>각 최대 2회]
-  C --> G1{{GATE-1 스펙 승인<br/>수정과 거절 합쳐 3회}}
-  G1 --> D[B1 plan, B2 tasks]
-  D --> E[B3 analyze<br/>최대 3회]
-  E --> F[B4 모델링, 테스트 작성<br/>red가 될 때까지 최대 2회]
-  F --> H[B5 implement]
-  H --> I[B6 검증과 리뷰<br/>최대 5회]
-  I --> J[B7 converge<br/>최대 3회, 작업이 남으면 B5로]
-  J --> K[C1 최종 analyze]
-  K --> G2{{GATE-2 reconcile, archive<br/>병합 감사, 최대 3회}}
-  G2 --> Z([DONE])
-```
-
-- 모든 루프에 상한이 있습니다. 최악의 경우 에이전트 호출은 73번입니다(테스트 작성 서브에이전트 제외).
-- 고쳐도 아무것도 바뀌지 않거나(진전 없음), 실패가 늘어나거나(퇴행), 구현 쪽이 테스트를 고치면(테스트 변조) 상한 전에 멈춥니다.
-- 테스트는 구현과 앞 단계 맥락을 모르는 `test-writer` 서브에이전트가 spec과 contract만 보고 먼저 씁니다. 구현하는 에이전트는 테스트 파일을 고칠 수 없습니다.
-
-### 멈췄을 때
-
-```bash
-specify workflow status            # 실행 목록과 멈춘 단계
-cat specs/<기능>/loop/halt.md      # 멈춘 이유와 할 일
-```
-
-- **gate에서 기다리는 중**(status가 `paused`): `--resume <run_id>`로 이어서 실행합니다.
-- **HALT 또는 ABORT**(status가 `failed`): 상한이나 멈춤 조건에 걸린 것입니다. 이어서 실행하지 않습니다. `halt.md`를 보고 원인(spec, plan, contracts)을 고친 뒤 새로 실행합니다. 상한을 늘리는 옵션은 일부러 두지 않았습니다.
-- 단계마다 판정 결과는 `specs/<기능>/loop/*.json`에, 검증 로그는 `loop/verify/`에 남습니다.
+- 상태는 `node scripts/sdd-state.mjs`로 언제든 확인할 수 있습니다.
+- 세션이 끊겨도 다시 `sdd-next`를 부르면 파일에서 상태를 읽어 이어 갑니다.
+- 루프는 없습니다. 조건을 만족하지 못하면 무엇이 부족한지 보여 주고 멈춥니다.
+- 스킬은 매번 마지막에 지금 단계와 다음에 할 일을 알려 줍니다.
+- 진행 중에 다시 묻고 싶은 점이 생기면 `/sdd-next clarify`(Codex는 `$sdd-next clarify`)로 clarify를 한 라운드 더 합니다.
+- 앞 단계로 돌아갈 수 있습니다. plan이나 implement 중에 스펙을 고쳐야 하면 에이전트가 멈추고 돌아갈지 묻습니다. "스펙부터 다시 하자"처럼 직접 말해도 됩니다. 앞 단계 산출물을 고치면 뒤 단계에 적힌 해시가 달라져, 그 다음 단계(예: 스펙을 고치면 clarify, plan, 승인)부터 차례대로 다시 진행합니다.
 
 ### 끝난 뒤
 
-DONE이 나오면 코드, 테스트, `specs/<기능>/`, 갱신된 `.specify/memory/`를 함께 커밋하고 `pr` 스킬로 PR을 올립니다. 리뷰 뒤에 코드가 바뀌면 `/speckit-archive-run`을 다시 실행합니다. 같은 기능을 다시 합쳐도 결과는 같습니다.
-
-### 손으로 쓰기
-
-루프 없이 단계별 명령을 직접 써도 됩니다. Claude Code는 `/speckit-specify`, Codex는 `$speckit-specify` 형태로 부릅니다.
-
-```text
-/speckit-specify <무엇을, 왜>
-/speckit-clarify
-/speckit-plan <기술 방향>
-/speckit-tasks
-/speckit-analyze
-/speckit-implement
-/speckit-converge
-/speckit-archive-run specs/<기능>
-```
+archive까지 끝나면 코드, 테스트, `openspec/`의 변경을 함께 커밋하고 `pr` 스킬로 PR을 올립니다. archive는 PR을 머지하기 **전에** 같은 브랜치에서 합니다. 그래야 `develop`의 기준 스펙이 `develop`의 코드와 같습니다.
 
 ### 파일 위치
 
-| 위치                                                                | 내용                                                                                                                 |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `.specify/memory/constitution.md`                                   | 프로젝트 원칙. 코드 규칙은 `AGENTS.md`와 `code-writer`, `fp-apply` 스킬을 가리킵니다                                 |
-| `.specify/memory/spec.md`, `plan.md`, `changelog.md`                | 구현된 기능을 하나로 합친 스펙, 기술 결정, 병합 기록. archive가 고칩니다                                             |
-| `specs/<기능>/`                                                     | 기능 하나의 spec, plan, tasks, contracts와 루프 기록(`loop/`)                                                        |
-| `.specify-src/`                                                     | 이 저장소용 preset, autopilot 확장, workflow의 원본과 테스트(`pnpm speckit:check`)                                   |
-| `.specify/`, `.claude/skills/speckit-*`, `.agents/skills/speckit-*` | spec-kit이 설치한 파일. 직접 고치지 않고 `.specify-src/`를 고친 뒤 `scripts/speckit-setup.sh --rebuild`를 실행합니다 |
+| 위치                                      | 내용                                                                          |
+| ----------------------------------------- | ----------------------------------------------------------------------------- |
+| `openspec/specs/<도메인>/spec.md`         | 구현된 요구사항 전체(기준 스펙). 도메인마다 파일 하나. archive만 고칩니다     |
+| `openspec/changes/<이름>/`                | 진행 중인 변경(`proposal.md`, `specs/`, `clarify.md`, `plan.md`, `verify.md`) |
+| `openspec/changes/archive/<날짜>-<이름>/` | 끝난 변경의 기록. 왜, 어떻게 바꿨는지가 남습니다                              |
+| `openspec/schemas/namaste/`               | 단계별 규칙(`schema.yaml`)과 산출물 템플릿                                    |
+| `openspec/config.yaml`                    | 프로젝트 원칙과 산출물별 규칙                                                 |
+| `scripts/sdd-state.mjs`                   | 상태 판정 스크립트와 테스트(`pnpm sdd:check`)                                 |
+| `.agents/skills/sdd-next/`                | 입구 스킬과 `test-writer` 지침                                                |
 
 ## 브랜치 전략과 릴리스
 

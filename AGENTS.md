@@ -13,7 +13,7 @@ pnpm format:check     # Prettier 검사 (format으로 자동 수정)
 pnpm format:check:rust # rustfmt 검사 (format:rust로 자동 수정)
 pnpm test             # Vitest 한 번 실행 (test:watch는 watch 모드)
 pnpm test:rust        # cargo test
-pnpm speckit:check     # spec-kit autopilot 스크립트와 루프 검사 (bats)
+pnpm sdd:check        # SDD 상태 판정 스크립트 테스트 (node:test)
 pnpm build            # typecheck 후 renderer만 out/renderer에 빌드
 pnpm build:unpack     # 설치 파일 없이 앱 실행 파일만 빌드 (src-tauri/target/release/)
 pnpm build:mac        # dmg 패키징. build:win은 nsis 설치 파일, build:win:arm64는 Windows ARM용 nsis 설치 파일
@@ -21,7 +21,7 @@ pnpm build:mac        # dmg 패키징. build:win은 nsis 설치 파일, build:wi
 
 - 테스트는 TS가 Vitest(+ fast-check), Rust가 `cargo test`입니다. TS 테스트는 소스 옆에 `*.test.ts(x)`로, Rust 테스트는 같은 파일의 `#[cfg(test)] mod tests`에 둡니다. Vitest 설정은 `vite.config.ts`의 `test`에 있습니다.
 - core(순수 함수)를 새로 만들거나 바꿀 때는 테스트를 먼저 씁니다. 버그를 고칠 때는 그 버그를 재현하는 테스트부터 씁니다. 원인이 shell(컴포넌트, store, 명령)에 있으면 원인이 되는 계산을 core로 옮긴 뒤 그 테스트를 씁니다.
-- PR CI(`pr-check.yml`)는 `format:check`, `lint`, `test`, `build`, `format:check:rust`, `lint:rust`, `test:rust`를 돌립니다.
+- PR CI(`pr-check.yml`)는 `format:check`, `lint`, `test`, `build`, `format:check:rust`, `lint:rust`, `test:rust`를 돌립니다. SDD 검사(`sdd:check`, OpenSpec schema와 스펙 형식 검사)는 별도 job으로 돕니다.
 - Node 24.21.0 이상이 필요합니다(`.nvmrc`). `pnpm-workspace.yaml`의 `engineStrict` 때문에 Node 버전이 낮으면 `pnpm run`과 `pnpm install`이 실패하니, 먼저 `nvm use`를 실행하세요.
 - Rust stable 툴체인이 필요합니다(`Cargo.toml`의 `rust-version` 이상). `rustup update stable`로 맞춥니다.
 - 커밋할 때 husky가 lint-staged로 ESLint, Prettier, rustfmt를 적용합니다. `commit-msg` hook은 없어서 커밋 메시지는 검사하지 않습니다.
@@ -175,20 +175,28 @@ renderer와 주고받는 타입은 Rust에 정의하고 [ts-rs](https://github.c
 - **`release/x.y.0` → `main` PR은 정식 버전 Release PR을 머지한 뒤에 엽니다.** 제목은 `Release x.y.0`처럼 Conventional Commits 형식이 아니게 씁니다. 그래야 main CHANGELOG에 중복 기록되지 않습니다.
 - `develop`에는 바로 나가도 되는 코드만 머지합니다. 큰 기능은 사용자에게 보이는 연결(버튼, 메뉴, 라우트)을 마지막 PR로 분리합니다.
 
-## spec-kit
+## SDD(OpenSpec)
 
-기능은 spec-kit autopilot 루프(`scripts/speckit-run.sh`)나 `speckit-*` 명령으로 만듭니다. 사람이 읽는 사용법은 README의 "spec-kit으로 기능 만들기"에 있고, 여기에는 에이전트가 지킬 규칙만 적습니다.
+기능은 [OpenSpec](https://github.com/Fission-AI/OpenSpec)으로 스펙을 먼저 쓰고 만듭니다. 입구는 `sdd-next` 스킬 하나입니다. 사람이 읽는 사용법은 README의 "스펙부터 쓰고 기능 만들기"에 있고, 여기에는 에이전트가 지킬 규칙만 적습니다.
 
-- **기존 스펙 먼저**: 새 기능의 spec을 쓰기 전에 `.specify/memory/spec.md`, `plan.md`에서 관련 요구사항을 읽습니다. memory가 "구현된 기능의 스펙"의 기준입니다. `.specify/memory/constitution.md`의 원칙과 스펙 작성 규칙(도메인 코드, `FR-<도메인>-NNN`)을 따릅니다.
-- **memory는 archive만 고칩니다**: `.specify/memory/spec.md`, `plan.md`, `changelog.md`를 손으로 고치지 않습니다. 기능을 머지하기 전에 `/speckit-archive-run specs/<기능>`으로 합칩니다.
-- **루프 안의 규칙**: 명령 인자가 `[autopilot]`으로 시작하거나 `speckit-autopilot-*` 명령으로 실행되면 autopilot 루프의 한 단계입니다. 이때는 아래를 지킵니다.
-  - 사용자에게 질문하지 않고 결과를 파일로 남깁니다.
-  - 명령 절차에 있는 확장 훅(memory-loader, reconcile 등)을 실행하지 않습니다. 기존 스펙은 기능 디렉터리의 `context.md`로 봅니다. reconcile은 GATE-2에서 사람이 실행합니다.
-  - autopilot의 판정 스크립트와 루프 정의(`.specify/extensions/autopilot/`, `.specify-src/`, `scripts/speckit-*.sh`, `.specify/workflows/`)를 읽거나 실행하지 않습니다. 결과는 루프가 따로 판정합니다. 명령 절차가 부르는 core 스크립트(`.specify/scripts/`)는 그대로 씁니다.
-  - `humanizer`를 부르지 않습니다. 한국어 문장은 `korean-tech-writing`으로 쓰고, AI 말투 점검은 GATE-1, GATE-2 직전의 `speckit-autopilot-polish` 단계에서만 합니다.
-  - 테스트 파일(`*.test.ts(x)`, Rust의 `#[cfg(test)] mod tests`)은 `test-writer` 서브에이전트만 쓰고, 구현 쪽은 고치지 않습니다.
-  - 커밋, push, 브랜치 이동은 하지 않습니다.
-- **설치본은 고치지 않습니다**: `.specify/`, `.claude/skills/speckit-*`, `.agents/skills/speckit-*`는 spec-kit이 만든 파일입니다. preset, autopilot 확장, workflow는 `.specify-src/`에서 고치고 `scripts/speckit-setup.sh --rebuild`로 다시 설치한 뒤 `pnpm speckit:check`를 돌립니다. `.specify-src/`와 설치본은 바이트까지 같아야 해서 Prettier 대상에서 뺐습니다.
+- **상태는 스크립트가 정합니다**: `node scripts/sdd-state.mjs`가 변경 폴더를 보고 상태(proposal → specs → clarify → plan → approval → implement → verify → archive)를 판정합니다. `sdd-next`는 그 상태의 일 하나만 하고 멈춥니다. 상태를 추측하거나 두 상태 이상을 한 번에 진행하지 않습니다.
+- **규칙은 한 곳에만 둡니다**: 단계별 규칙은 `openspec/schemas/namaste/schema.yaml`, 프로젝트 원칙과 산출물별 규칙은 `openspec/config.yaml`에 있습니다. 스킬과 문서에는 옮겨 적지 않습니다. 규칙을 바꿀 때는 이 두 파일을 고치고 `pnpm exec openspec schema validate namaste`와 `pnpm sdd:check`를 돌립니다.
+- **clarify는 다시 할 수 있습니다**: `sdd-next clarify`로 proposal 이후 archive 전 어느 상태에서든 clarify를 한 라운드 더 합니다.
+- **앞 단계로 돌아갈 수 있습니다**: 앞 단계 산출물을 고쳐야 하면 멈추고 사람에게 묻습니다. 고치면 뒤 단계에 적힌 해시(`spec-hash:`, `x-approved:`, `plan-hash:`)가 달라져 상태 판정이 그 다음 단계부터 다시 진행합니다. 절차는 `openspec/config.yaml`의 `context`에 있습니다.
+- **승인은 사람만 합니다**: `.openspec.yaml`의 `x-approved:`는 사람이 명시적으로 승인했을 때만 `node scripts/sdd-state.mjs <change> --hash approval` 값으로 씁니다. 승인 전에는 구현하지 않습니다.
+- **테스트는 구현을 모르는 쪽이 먼저 씁니다**: implement 단계에서 `test-writer` 서브에이전트가 delta 스펙과 `plan.md`의 설계만 보고 테스트를 씁니다. 구현하는 쪽은 테스트 파일을 고치지 않고, 이의는 `test-disputes.md`에 적습니다.
+- **요구사항 ID**: 기능 요구사항(Functional Requirement)은 `FR-<도메인>-NNN`, 성공 기준(Success Criteria)은 `SC-<도메인>-NNN`입니다. 도메인 코드는 영어 대문자 2~6자이고 capability 경로는 그 소문자입니다. 한 번 쓴 ID는 지워진 뒤에도 다시 쓰지 않습니다.
+- **스펙이 쌓이는 곳**:
+
+  | 무엇                            | 위치                                                    | 누가 바꾸나 |
+  | ------------------------------- | ------------------------------------------------------- | ----------- |
+  | 구현된 요구사항 전체(기준 스펙) | `openspec/specs/<도메인>/spec.md`, 도메인마다 파일 하나 | archive만   |
+  | 진행 중인 변경                  | `openspec/changes/<이름>/`                              | `sdd-next`  |
+  | 끝난 변경의 기록                | `openspec/changes/archive/<날짜>-<이름>/`               | archive만   |
+  | 단계 규칙                       | `openspec/schemas/namaste/`, `openspec/config.yaml`     | 사람이 PR로 |
+
+- **archive는 머지 전에**: 기능 PR을 머지하기 전에 같은 브랜치에서 archive까지 끝냅니다. 그래야 `develop`의 기준 스펙이 `develop`의 코드와 같습니다. `openspec/specs/`는 손으로 고치지 않습니다.
+- OpenSpec CLI는 `devDependencies`에 고정한 버전을 `pnpm exec openspec`으로 씁니다. 사용 통계를 보내지 않도록 `OPENSPEC_TELEMETRY=0`을 붙입니다. OpenSpec이 만드는 기본 스킬과 명령(`openspec-*`, `/opsx:*`)은 설치하지 않습니다. `openspec init`이나 `openspec update`를 다시 실행할 때는 `--tools none`을 씁니다.
 
 ## 스킬
 
@@ -207,9 +215,9 @@ renderer와 주고받는 타입은 Rust에 정의하고 [ts-rs](https://github.c
 | `zustand-state-management`    | `code-writer`가 store 작업에서 부릅니다. 코드를 바꾸지 않는 질문에는 바로 씁니다. R3F에서 쓸 때는 아래 규칙을 함께 지킵니다                                                                                                            |
 | `vercel-react-best-practices` | `code-writer`가 React 작업에서 부릅니다. 코드를 바꾸지 않는 리뷰와 질문에는 바로 씁니다. Next.js, RSC, SSR 규칙은 이 앱에 해당하지 않습니다                                                                                            |
 | `fp-apply`                    | `code-writer`가 로직 작업에서 부릅니다. 코드를 바꾸지 않는 설계 질문과 함수형 리뷰에는 바로 씁니다. 계산 규칙은 순수 함수로 두고, 사이드 이펙트는 이벤트 핸들러, `Effect`, store action, `useFrame`, `api/`, Rust 명령 쪽으로 나눕니다 |
-| `speckit-*`                   | spec-kit 단계 명령(`speckit-specify`, `speckit-plan` 등)과 확장 명령(`speckit-archive-run`, `speckit-autopilot-*`). 루프 밖에서 단계를 직접 실행할 때 씁니다. 위 "spec-kit" 규칙을 함께 지킵니다                                       |
+| `sdd-next`                    | 기능을 스펙부터 만들 때. 새 기능을 시작하거나 진행 중인 `openspec/changes/` 작업을 이어 갈 때 부릅니다. 위 "SDD(OpenSpec)" 규칙을 함께 지킵니다                                                                                        |
 
-- 스킬 원본은 `.agents/skills/` 한 곳에만 둡니다. 에이전트별 스킬 폴더(예: `.claude/skills/`)에는 원본을 가리키는 스킬별 심링크만 둡니다. 스킬을 추가하거나 고칠 때도 `.agents/skills/`에서 작업합니다. 예외는 `speckit-*`입니다. spec-kit이 Claude용(`.claude/skills/`)과 Codex용(`.agents/skills/`)을 따로 만들고, 둘은 명령 호출 표기(`/speckit-`, `$speckit-`)가 달라 심링크로 합칠 수 없습니다.
+- 스킬 원본은 `.agents/skills/` 한 곳에만 둡니다. 에이전트별 스킬 폴더(예: `.claude/skills/`)에는 원본을 가리키는 스킬별 심링크만 둡니다. 스킬을 추가하거나 고칠 때도 `.agents/skills/`에서 작업합니다.
 - `.agents`는 `.prettierignore`와 ESLint `ignores`에 들어 있습니다. 외부에서 가져온 스킬을 원본 그대로 두기 위해서입니다.
 - `threejs-*` 13개는 [CloudAI-X/threejs-skills](https://github.com/CloudAI-X/threejs-skills)(MIT)를 그대로 가져온 것입니다. 갱신할 때도 원본을 덮어쓰고 직접 고치지 않습니다.
 - **3D 작업의 CSP 제약**: CSP가 외부 주소를 막으므로 에셋과 디코더는 앱 안(`'self'`)에서만 불러옵니다. drei `Environment`의 `preset`(외부 HDR)은 쓰지 말고 `files`에 앱 안의 HDR 파일을 넘깁니다. `useGLTF`의 기본 Draco 디코더도 gstatic에서 받아 오므로, Draco 모델을 쓸 때는 디코더를 앱에 넣고 `useGLTF.setDecoderPath`로 그 경로를 가리킵니다.
