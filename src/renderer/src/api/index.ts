@@ -1,6 +1,7 @@
 import { getTauriVersion, getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { ResultAsync } from 'neverthrow';
+import type { Detection } from '@renderer/types/bindings/Detection';
 
 /** Rust 명령 에러가 아닌 IPC 실패. 없는 명령이나 인자 모양 불일치처럼 Tauri가 문자열로 reject할 때 쓴다. */
 export type IpcError = { readonly kind: 'ipc'; readonly message: string };
@@ -27,4 +28,8 @@ export const api = {
   ping: (): ResultAsync<void, IpcError> => call(invoke('ping')),
   getAppVersion: (): ResultAsync<string, IpcError> => call(getVersion()),
   getTauriVersion: (): ResultAsync<string, IpcError> => call(getTauriVersion()),
+  /** 보관한 에이전트 감지 결과. 앱 시작 감지가 아직이면 끝날 때까지 기다린다. */
+  getAgentDetection: (): ResultAsync<Detection, IpcError> => call(invoke('agent_detection')),
+  /** 에이전트를 새로 감지한다. 멈춘 WSL 배포판도 켜서 확인한다. */
+  redetectAgents: (): ResultAsync<Detection, IpcError> => call(invoke('redetect_agents')),
 };

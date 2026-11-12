@@ -177,3 +177,53 @@ code {
     display: none;
   }
 }
+
+/* flex gap은 Safari 14.1부터라 macOS 빌드 타깃(safari13)에서는 margin으로 간격을 둔다 */
+.agent-detection {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 24px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.agent-detection header {
+  display: flex;
+  align-items: center;
+}
+
+.agent-detection h2 {
+  margin: 0 12px 0 0;
+  font-size: 16px;
+}
+
+.agent-detection button {
+  margin-left: auto;
+}
+
+.agent-detection ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-detection li {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--ev-c-gray-1);
+}
+
+.agent-detection li span {
+  margin-right: 12px;
+}
+
+.agent-detection-busy,
+.agent-detection-detail {
+  opacity: 0.7;
+}
+
+.agent-detection-detail {
+  font-family: 'Menlo', 'Lucida Console', monospace;
+  word-break: break-all;
+}

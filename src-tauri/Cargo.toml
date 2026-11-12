@@ -20,6 +20,14 @@ serde = { version = "1.0.229", features = ["derive"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 ts-rs = "12"
+# 감지할 때 외부 프로세스를 띄우고 시간 제한을 건다. Tauri가 이미 쓰는 tokio 1.x와 같은 크레이트다
+tokio = { version = "1", features = ["process", "time", "sync", "macros", "rt"] }
+
+[dev-dependencies]
+# 테스트에서 시간을 멈추고 앞당겨 10초 상한을 실제로 기다리지 않고 확인한다
+tokio = { version = "1", features = ["test-util", "rt", "macros"] }
+# 출력 해석과 디렉터리 목록의 성질(중복 없음, 순서 유지 등)을 무작위 입력으로 확인한다
+proptest = "1"
 
 [profile.release]
 codegen-units = 1
