@@ -11,10 +11,6 @@ build/*.plist
 CHANGELOG.md
 .agents
 src/renderer/src/types/bindings
-# spec-kit이 만들고 관리하는 파일 (archive가 memory를 다시 쓰고, CLI가 스킬을 갱신함)
-.specify
-.claude/skills/speckit-*
-# spec-kit에 설치하는 원본. 설치본(.specify/)과 바이트까지 같아야 registry 해시가 맞는다
-.specify-src
-# spec-kit autopilot 루프 기록. 테스트 입력 묶음과 snapshot에 소스 사본이 들어 있다
-specs/*/loop
+# OpenSpec CLI가 쓰는 기준 스펙과 변경 기록 (archive가 기준 스펙을 다시 씀)
+openspec/specs
+openspec/changes
