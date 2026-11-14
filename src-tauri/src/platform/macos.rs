@@ -110,3 +110,39 @@ async fn read_login_shell_path() -> Option<String> {
     let output = process::run(command, SHELL_PATH_LIMIT).await?;
     parse_marked_path(&process::stdout_text(&output)?, PATH_MARKER)
 }
+
+// ---------------------------------------------------------------- 훅 설치
+
+use super::fs::NativeFs;
+use crate::agent::domain::model::AgentEntry;
+use crate::hook::domain::model::{InstallFailure, InstallTarget};
+use std::path::Path;
+
+/// macOS의 설정 파일 접근.
+pub type HookFs = NativeFs;
+
+/// 앱 파일(엔드포인트, 훅 스크립트)을 두는 폴더. `~/.namaste-world`
+pub fn app_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".namaste-world"))
+}
+
+/// 감지 항목의 설치 대상. macOS 환경 하나뿐이다.
+pub async fn hook_target(
+    entry: &AgentEntry,
+    version: &str,
+    app_dir: &Path,
+) -> Result<(InstallTarget, HookFs), InstallFailure> {
+    let home = app_dir.parent().ok_or_else(|| InstallFailure::Io {
+        message: "홈 폴더를 찾지 못했습니다".to_owned(),
+    })?;
+    Ok((
+        InstallTarget {
+            agent: entry.agent,
+            environment: entry.environment.clone(),
+            version: version.to_owned(),
+            home: home.to_string_lossy().into_owned(),
+            endpoint_path: app_dir.join("endpoint").to_string_lossy().into_owned(),
+        },
+        NativeFs,
+    ))
+}

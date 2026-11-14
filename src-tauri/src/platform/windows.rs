@@ -123,3 +123,140 @@ fn probe_script() -> String {
     ]
     .join("; ")
 }
+
+// ---------------------------------------------------------------- 훅 설치
+
+use super::fs::{blocking, read_file, write_file, NativeFs};
+use crate::agent::domain::model::AgentEntry;
+use crate::hook::domain::model::{InstallFailure, InstallTarget};
+use crate::hook::fs::ConfigFs;
+use std::io;
+use std::path::Path;
+
+/// 배포판 안의 명령(`printf`, `wslpath`, `chmod`)에 주는 시간.
+const WSL_COMMAND_LIMIT: Duration = Duration::from_secs(5);
+
+/// Windows의 설정 파일 접근. Windows 자체는 그대로, WSL 배포판은 `\\wsl$` 경로로 읽고 쓴다.
+pub enum HookFs {
+    Native(NativeFs),
+    Wsl(WslFs),
+}
+
+impl ConfigFs for HookFs {
+    async fn read(&self, path: &str) -> io::Result<Option<String>> {
+        match self {
+            HookFs::Native(fs) => fs.read(path).await,
+            HookFs::Wsl(fs) => fs.read(path).await,
+        }
+    }
+
+    async fn write(&self, path: &str, contents: &str, mode: u32) -> io::Result<()> {
+        match self {
+            HookFs::Native(fs) => fs.write(path, contents, mode).await,
+            HookFs::Wsl(fs) => fs.write(path, contents, mode).await,
+        }
+    }
+}
+
+/// WSL 배포판 하나의 파일. 경로는 배포판 안의 POSIX 경로다.
+pub struct WslFs {
+    distro: String,
+}
+
+impl WslFs {
+    fn host_path(&self, path: &str) -> PathBuf {
+        PathBuf::from(format!(
+            r"\\wsl$\{}{}",
+            self.distro,
+            path.replace('/', "\\")
+        ))
+    }
+}
+
+impl ConfigFs for WslFs {
+    async fn read(&self, path: &str) -> io::Result<Option<String>> {
+        let host = self.host_path(path);
+        blocking(move || read_file(&host)).await
+    }
+
+    /// Windows 쪽에서는 배포판 안의 심볼릭 링크를 따라가지 못하고 POSIX 권한도 줄 수 없다.
+    /// 그래서 링크와 기존 권한은 배포판 안에서 `readlink -f`, `stat`으로 읽고, 쓴 뒤 `chmod`로 권한을 맞춘다.
+    /// 기존 파일은 원래 권한을, 새 파일은 `mode`를 준다.
+    async fn write(&self, path: &str, contents: &str, mode: u32) -> io::Result<()> {
+        let resolved = wsl_output(&self.distro, &["readlink", "-f", path])
+            .await
+            .unwrap_or_else(|_| path.to_owned());
+        let existing_mode = wsl_output(&self.distro, &["stat", "-c", "%a", &resolved])
+            .await
+            .ok();
+        let host = self.host_path(&resolved);
+        let contents = contents.to_owned();
+        blocking(move || write_file(&host, &contents, mode)).await?;
+        let mode = existing_mode.unwrap_or_else(|| format!("{mode:o}"));
+        let mut command = wsl_command();
+        command.args(["-d", &self.distro, "-e", "chmod", &mode, &resolved]);
+        match process::run(command, WSL_COMMAND_LIMIT).await {
+            Some(output) if output.status.success() => Ok(()),
+            _ => Err(io::Error::other(format!(
+                "{resolved}의 권한을 맞추지 못했습니다"
+            ))),
+        }
+    }
+}
+
+/// 앱 파일(엔드포인트, 훅 스크립트)을 두는 폴더. `%USERPROFILE%\.namaste-world`
+pub fn app_dir() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE").map(|home| PathBuf::from(home).join(".namaste-world"))
+}
+
+/// 감지 항목의 설치 대상. WSL 배포판이면 그 배포판의 홈과, 배포판에서 읽을 엔드포인트 경로를 알아낸다.
+pub async fn hook_target(
+    entry: &AgentEntry,
+    version: &str,
+    app_dir: &Path,
+) -> Result<(InstallTarget, HookFs), InstallFailure> {
+    let endpoint = app_dir.join("endpoint").to_string_lossy().into_owned();
+    let target = |home: String, endpoint_path: String| InstallTarget {
+        agent: entry.agent,
+        environment: entry.environment.clone(),
+        version: version.to_owned(),
+        home,
+        endpoint_path,
+    };
+    match &entry.environment {
+        Environment::Wsl { distro } => {
+            let home = wsl_output(distro, &["sh", "-c", "printf '%s' \"$HOME\""]).await?;
+            let endpoint_path = wsl_output(distro, &["wslpath", "-u", &endpoint]).await?;
+            Ok((
+                target(home, endpoint_path),
+                HookFs::Wsl(WslFs {
+                    distro: distro.clone(),
+                }),
+            ))
+        }
+        Environment::Windows | Environment::Macos => {
+            let home = app_dir.parent().ok_or_else(|| InstallFailure::Io {
+                message: "홈 폴더를 찾지 못했습니다".to_owned(),
+            })?;
+            Ok((
+                target(home.to_string_lossy().into_owned(), endpoint),
+                HookFs::Native(NativeFs),
+            ))
+        }
+    }
+}
+
+/// 배포판 안에서 명령을 실행하고 stdout 첫 줄을 돌려준다.
+async fn wsl_output(distro: &str, args: &[&str]) -> Result<String, InstallFailure> {
+    let mut command = wsl_command();
+    command.args(["-d", distro, "-e"]).args(args);
+    process::run(command, WSL_COMMAND_LIMIT)
+        .await
+        .as_ref()
+        .and_then(process::stdout_text)
+        .and_then(|text| text.lines().next().map(str::to_owned))
+        .filter(|line| !line.is_empty())
+        .ok_or_else(|| InstallFailure::Io {
+            message: format!("WSL 배포판 {distro}에서 {}을 실행하지 못했습니다", args[0]),
+        })
+}

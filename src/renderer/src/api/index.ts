@@ -1,7 +1,11 @@
 import { getTauriVersion, getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { ResultAsync } from 'neverthrow';
 import type { Detection } from '@renderer/types/bindings/Detection';
+import type { HookEvent } from '@renderer/types/bindings/HookEvent';
+import type { HookInstallation } from '@renderer/types/bindings/HookInstallation';
+import { HOOK_EVENT, HOOK_INSTALLATION } from '@renderer/types/ipc';
 
 /** Rust 명령 에러가 아닌 IPC 실패. 없는 명령이나 인자 모양 불일치처럼 Tauri가 문자열로 reject할 때 쓴다. */
 export type IpcError = { readonly kind: 'ipc'; readonly message: string };
@@ -32,4 +36,15 @@ export const api = {
   getAgentDetection: (): ResultAsync<Detection, IpcError> => call(invoke('agent_detection')),
   /** 에이전트를 새로 감지한다. 멈춘 WSL 배포판도 켜서 확인한다. */
   redetectAgents: (): ResultAsync<Detection, IpcError> => call(invoke('redetect_agents')),
+  /** 보관한 훅 설치 결과. 첫 설치가 아직이면 끝날 때까지 기다린다. */
+  getHookInstallation: (): ResultAsync<HookInstallation, IpcError> =>
+    call(invoke('hook_installation')),
+  /** 훅 이벤트를 받을 때마다 handler를 부른다. 돌려받은 함수로 구독을 끝낸다. */
+  onHookEvent: (handler: (event: HookEvent) => void): ResultAsync<UnlistenFn, IpcError> =>
+    call(listen<HookEvent>(HOOK_EVENT, (message) => handler(message.payload))),
+  /** 훅 설치가 끝날 때마다(다시 감지 뒤 포함) handler를 부른다. */
+  onHookInstallation: (
+    handler: (installation: HookInstallation) => void,
+  ): ResultAsync<UnlistenFn, IpcError> =>
+    call(listen<HookInstallation>(HOOK_INSTALLATION, (message) => handler(message.payload))),
 };

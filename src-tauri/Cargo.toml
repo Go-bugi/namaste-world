@@ -19,9 +19,25 @@ tauri-build = { version = "2", features = [] }
 serde = { version = "1.0.229", features = ["derive"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-ts-rs = "12"
+# serde-json-impl: 훅 이벤트의 원래 입력(serde_json::Value)을 TS 타입으로 내보낸다
+ts-rs = { version = "12", features = ["serde-json-impl"] }
+# 훅 이벤트를 받는 127.0.0.1 HTTP 서버. Tauri가 쓰는 tokio 위에서 돈다
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+# 사용자 설정 파일(settings.json, hooks.json)을 고칠 때 키 순서를 그대로 둔다
+serde_json = { version = "1", features = ["preserve_order"] }
+# Codex config.toml을 주석과 서식을 지키며 고친다
+toml_edit = "0.25"
+# Codex 훅 신뢰 해시(SHA-256)
+sha2 = "0.10"
+# 훅 요청 토큰
+getrandom = "0.4"
+# 1MB를 넘는 훅 본문을 메모리에 다 올리지 않고 스트림으로 해석한다
+tokio-util = { version = "0.7", features = ["io", "io-util"] }
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+# 앱을 하나만 실행하고, 다시 실행하면 켜진 앱의 창을 앞으로 가져온다
+tauri-plugin-single-instance = "2"
 # 감지할 때 외부 프로세스를 띄우고 시간 제한을 건다. Tauri가 이미 쓰는 tokio 1.x와 같은 크레이트다
-tokio = { version = "1", features = ["process", "time", "sync", "macros", "rt"] }
+tokio = { version = "1", features = ["process", "time", "sync", "macros", "rt", "net", "fs"] }
 
 [dev-dependencies]
 # 테스트에서 시간을 멈추고 앞당겨 10초 상한을 실제로 기다리지 않고 확인한다
