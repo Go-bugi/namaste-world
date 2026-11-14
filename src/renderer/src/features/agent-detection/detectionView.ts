@@ -1,15 +1,19 @@
 import type { AgentEntry } from '@renderer/types/bindings/AgentEntry';
-import type { AgentKind } from '@renderer/types/bindings/AgentKind';
 import type { AgentStatus } from '@renderer/types/bindings/AgentStatus';
 import type { Detection } from '@renderer/types/bindings/Detection';
-import type { Environment } from '@renderer/types/bindings/Environment';
 import type { FailureReason } from '@renderer/types/bindings/FailureReason';
+import {
+  agentEnvironmentKey,
+  agentLabel,
+  environmentLabel,
+  type AgentLabel,
+} from '@renderer/shared/lib/agentLabels';
 
 /** 목록 화면의 한 줄. label이 붙은 값은 사용자에게 그대로 보이는 문구다. */
 export type DetectionRow = {
   /** React key. `${agent}:${환경 kind}:${distro ?? ''}` */
   readonly key: string;
-  readonly agentLabel: 'Claude Code' | 'Codex';
+  readonly agentLabel: AgentLabel;
   /** 'macOS' | 'Windows' | `WSL · ${distro}` */
   readonly environmentLabel: string;
   readonly statusLabel: '설치됨' | '설치되지 않음' | '확인 실패' | '멈춤';
@@ -28,32 +32,12 @@ export function toRows(detection: Detection): readonly DetectionRow[] {
 function toRow({ agent, environment, status }: AgentEntry): DetectionRow {
   const detail = detailOf(status);
   return {
-    key: `${agent}:${environment.kind}:${environment.kind === 'wsl' ? environment.distro : ''}`,
+    key: agentEnvironmentKey(agent, environment),
     agentLabel: agentLabel(agent),
     environmentLabel: environmentLabel(environment),
     statusLabel: statusLabel(status),
     ...(detail === undefined ? {} : { detail }),
   };
-}
-
-function agentLabel(agent: AgentKind): DetectionRow['agentLabel'] {
-  switch (agent) {
-    case 'claude':
-      return 'Claude Code';
-    case 'codex':
-      return 'Codex';
-  }
-}
-
-function environmentLabel(environment: Environment): string {
-  switch (environment.kind) {
-    case 'macos':
-      return 'macOS';
-    case 'windows':
-      return 'Windows';
-    case 'wsl':
-      return `WSL · ${environment.distro}`;
-  }
 }
 
 function statusLabel(status: AgentStatus): DetectionRow['statusLabel'] {

@@ -227,3 +227,54 @@ code {
   font-family: 'Menlo', 'Lucida Console', monospace;
   word-break: break-all;
 }
+
+.hook-events {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 24px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.hook-events header {
+  display: flex;
+  align-items: center;
+}
+
+.hook-events h2 {
+  margin: 0 12px 0 0;
+  font-size: 16px;
+}
+
+.hook-events ul,
+.hook-events ol {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hook-events ol {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.hook-events li {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--ev-c-gray-1);
+}
+
+.hook-events li span {
+  margin-right: 12px;
+}
+
+.hook-events-muted,
+.hook-events-detail {
+  opacity: 0.7;
+}
+
+.hook-events-detail {
+  font-family: 'Menlo', 'Lucida Console', monospace;
+  word-break: break-all;
+}

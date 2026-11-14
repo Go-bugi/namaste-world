@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import Versions from '@renderer/features/versions/Versions';
 import AgentDetectionPanel from '@renderer/features/agent-detection/AgentDetectionPanel';
+import HookEventsPanel from '@renderer/features/hook-events/HookEventsPanel';
 import logo from '@renderer/assets/logo.png';
 import { api } from '@renderer/api';
 
@@ -41,6 +42,7 @@ function App(): React.JSX.Element {
         </div>
       </div>
       <AgentDetectionPanel />
+      <HookEventsPanel />
       <Versions></Versions>
     </>
   );
