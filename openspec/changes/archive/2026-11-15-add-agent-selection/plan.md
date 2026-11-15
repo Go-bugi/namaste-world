@@ -298,6 +298,6 @@ export function toSelection(state: SelectionState): Selection | undefined;
 ### 6. 창 연결과 검증
 
 - [x] 6.1 `onboarding.html`, `windows/onboarding/`과 `vite.config.ts` 입력 등록. `windows/main/`을 작은 창(`TestScene` + `WindowDragArea`)으로 바꿈. `pnpm build` 통과 (FR-START-001, FR-WINDOW-001, FR-WINDOW-002)
-- [ ] 6.2 macOS 실기 확인. 앱 실행, 세 단계, 다음, 오른쪽 아래 작은 창, 투명·항상 위, 끌기, Cmd+W 뒤 독 클릭, 다시 실행, 다음 실행 때 미리 골라 둠, 조회 중 훅 이벤트 없음, 전환 1초 이내 (FR-START-001~007, FR-WINDOW-001~008, FR-HOOK-014, SC-WINDOW-001, SC-START-001)
-- [ ] 6.3 Windows 실기 확인(사용자에게 요청). WSL 항목 고를 때 조회, 두 모니터·다른 배율, 작업 표시줄 위 배치, Alt+F4 종료, 투명 배경 (FR-START-007, FR-WINDOW-003, FR-WINDOW-004, FR-WINDOW-005, FR-WINDOW-007, FR-HOOK-011)
+- [x] 6.2 macOS 실기 확인. 앱 실행, 세 단계, 다음, 오른쪽 아래 작은 창, 투명·항상 위, 끌기, Cmd+W 뒤 독 클릭, 다시 실행, 다음 실행 때 미리 골라 둠, 조회 중 훅 이벤트 없음, 전환 1초 이내 (FR-START-001~007, FR-WINDOW-001~008, FR-HOOK-014, SC-WINDOW-001, SC-START-001)
+- [x] 6.3 Windows 실기 확인(사용자에게 요청). WSL 항목 고를 때 조회, 두 모니터·다른 배율, 작업 표시줄 위 배치, Alt+F4 종료, 투명 배경 (FR-START-007, FR-WINDOW-003, FR-WINDOW-004, FR-WINDOW-005, FR-WINDOW-007, FR-HOOK-011)
 - [x] 6.4 PR CI와 같은 검사(`format:check`, `lint`, `test`, `build`, `format:check:rust`, `lint:rust`, `test:rust`)와 Windows 대상 `cargo clippy` (FR-HOOK-011)
