@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "onboarding",
+  "description": "시작 설정 창에서 쓰는 권한",
+  "windows": ["onboarding"],
+  "permissions": ["core:default"]
+}

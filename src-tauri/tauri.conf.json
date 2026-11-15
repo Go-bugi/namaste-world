@@ -13,12 +13,15 @@
   "app": {
     "windows": [
       {
-        "label": "main",
+        "label": "onboarding",
         "title": "Namaste World",
-        "width": 900,
-        "height": 670
+        "url": "onboarding.html",
+        "width": 720,
+        "height": 560,
+        "center": true
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:"
     }
