@@ -260,3 +260,118 @@ async fn wsl_output(distro: &str, args: &[&str]) -> Result<String, InstallFailur
             message: format!("WSL 배포판 {distro}에서 {}을 실행하지 못했습니다", args[0]),
         })
 }
+
+// ---------------------------------------------------------------- 모델 목록 조회
+
+use crate::model::host::{ModelHost, CLAUDE_INIT_ARGS, CLAUDE_INIT_SETTINGS, CODEX_MODELS_ARGS};
+use crate::model::query::MODEL_QUERY_LIMIT;
+
+/// Windows의 모델 목록 조회. Windows 자체는 감지한 실행 파일을 바로, WSL 배포판은 `wsl.exe`로 실행한다.
+pub struct ModelCli {
+    home: PathBuf,
+}
+
+impl ModelCli {
+    pub async fn new() -> Self {
+        Self {
+            home: std::env::var_os("USERPROFILE")
+                .map(PathBuf::from)
+                .unwrap_or_default(),
+        }
+    }
+
+    /// 배포판 안에서 로그인 셸로 `path`를 실행하는 명령. 감지 프로브처럼 흔한 설치 폴더를 `PATH` 앞에 붙여 `node`를 찾게 한다.
+    fn wsl_exec(distro: &str, path: &str) -> Command {
+        let mut command = wsl_command();
+        command.args([
+            "-d",
+            distro,
+            "--cd",
+            "~",
+            "-e",
+            "sh",
+            "-lc",
+            // wsl.exe를 죽여도 배포판 안의 프로세스는 남을 수 있어 coreutils timeout으로 한 번 더 상한을 건다
+            "for d in \"$HOME/.local/bin\" \"$HOME/.npm-global/bin\" \"$HOME/.bun/bin\" \"$HOME/.volta/bin\" \"$HOME\"/.nvm/versions/node/*/bin; do [ -d \"$d\" ] && PATH=\"$d:$PATH\"; done; if command -v timeout >/dev/null 2>&1; then exec timeout -s KILL 6 \"$0\" \"$@\"; fi; exec \"$0\" \"$@\"",
+            path,
+        ]);
+        command
+    }
+}
+
+impl ModelHost for ModelCli {
+    async fn claude_init<T: Send>(
+        &self,
+        environment: &Environment,
+        path: &str,
+        request: &str,
+        accept: impl Fn(&str) -> Option<T> + Send + Sync,
+    ) -> Option<T> {
+        let command = match environment {
+            Environment::Wsl { distro } => {
+                let mut command = Self::wsl_exec(distro, path);
+                command.args(CLAUDE_INIT_ARGS).arg(CLAUDE_INIT_SETTINGS);
+                command
+            }
+            Environment::Windows | Environment::Macos => {
+                // npm이 만든 claude.cmd는 배치 파일이라 따옴표와 중괄호가 든 인자를 넘기면 실행이 거부된다.
+                // 그래서 설정은 조회마다 이름이 다른 임시 파일로 쓰고 그 경로를 넘긴다. 겹친 조회가 서로의 파일을 덮지 않게 한다
+                static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+                let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let settings = std::env::temp_dir().join(format!(
+                    "namaste-world-claude-settings-{}-{n}.json",
+                    std::process::id()
+                ));
+                tokio::fs::write(&settings, CLAUDE_INIT_SETTINGS)
+                    .await
+                    .ok()?;
+                let mut command = Command::new(path);
+                command
+                    .current_dir(&self.home)
+                    .args(CLAUDE_INIT_ARGS)
+                    .arg(&settings);
+                let models = process::request_line(command, request, accept).await;
+                let _ = tokio::fs::remove_file(&settings).await;
+                return models;
+            }
+        };
+        process::request_line(command, request, accept).await
+    }
+
+    async fn codex_models(&self, environment: &Environment, path: &str) -> Option<String> {
+        let mut command = match environment {
+            Environment::Wsl { distro } => Self::wsl_exec(distro, path),
+            Environment::Windows | Environment::Macos => {
+                let mut command = Command::new(path);
+                command.current_dir(&self.home);
+                command
+            }
+        };
+        command.args(CODEX_MODELS_ARGS);
+        let output = process::run_tree(command, MODEL_QUERY_LIMIT).await?;
+        process::stdout_text(&output)
+    }
+
+    async fn codex_config(&self, environment: &Environment) -> Option<String> {
+        match environment {
+            Environment::Wsl { distro } => {
+                let mut command = wsl_command();
+                command.args([
+                    "-d",
+                    distro,
+                    "-e",
+                    "sh",
+                    "-c",
+                    "cat \"$HOME/.codex/config.toml\"",
+                ]);
+                let output = process::run(command, WSL_COMMAND_LIMIT).await?;
+                process::stdout_text(&output)
+            }
+            Environment::Windows | Environment::Macos => {
+                tokio::fs::read_to_string(self.home.join(".codex").join("config.toml"))
+                    .await
+                    .ok()
+            }
+        }
+    }
+}

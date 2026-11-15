@@ -9,9 +9,16 @@ mod process;
 mod windows;
 
 #[cfg(target_os = "macos")]
-pub use macos::{app_dir, hook_target, on_run_event, on_window_event, AgentHost};
+pub use macos::{app_dir, hook_target, on_run_event, on_window_event, AgentHost, ModelCli};
 #[cfg(target_os = "windows")]
-pub use windows::{app_dir, hook_target, AgentHost};
+pub use windows::{app_dir, hook_target, AgentHost, ModelCli};
+
+/// 창 배치를 논리 좌표(포인트)로 계산하는가. macOS는 모니터 위치를 "논리 원점 × 그 모니터의 배율"로 주어
+/// 배율이 다른 모니터끼리 물리 좌표가 겹치므로 논리 좌표로 계산한다. Windows는 전역 물리 좌표가 하나라 그대로 쓴다.
+#[cfg(target_os = "macos")]
+pub const LOGICAL_DESKTOP: bool = true;
+#[cfg(not(target_os = "macos"))]
+pub const LOGICAL_DESKTOP: bool = false;
 
 /// macOS가 아니면 창 이벤트는 기본 동작을 따른다.
 #[cfg(not(target_os = "macos"))]
@@ -23,7 +30,7 @@ pub fn on_run_event(_app: &tauri::AppHandle, _event: tauri::RunEvent) {}
 
 pub use fs::write_file;
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub use unsupported::{app_dir, hook_target, AgentHost};
+pub use unsupported::{app_dir, hook_target, AgentHost, ModelCli};
 
 /// macOS와 Windows가 아닌 OS. 확인할 환경이 없어 감지 결과가 비어 있다.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -58,6 +65,35 @@ mod unsupported {
     impl AgentHost {
         pub async fn new(_trigger: Trigger) -> Self {
             Self
+        }
+    }
+
+    /// 조회할 CLI가 없어 늘 실패한다. 고정 목록이 쓰인다.
+    pub struct ModelCli;
+
+    impl ModelCli {
+        pub async fn new() -> Self {
+            Self
+        }
+    }
+
+    impl crate::model::host::ModelHost for ModelCli {
+        async fn claude_init<T: Send>(
+            &self,
+            _environment: &Environment,
+            _path: &str,
+            _request: &str,
+            _accept: impl Fn(&str) -> Option<T> + Send + Sync,
+        ) -> Option<T> {
+            None
+        }
+
+        async fn codex_models(&self, _environment: &Environment, _path: &str) -> Option<String> {
+            None
+        }
+
+        async fn codex_config(&self, _environment: &Environment) -> Option<String> {
+            None
         }
     }
 

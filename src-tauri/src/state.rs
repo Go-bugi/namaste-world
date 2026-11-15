@@ -1,5 +1,7 @@
 use crate::agent::domain::model::Detection;
 use crate::hook::domain::model::HookInstallation;
+use crate::model::domain::model::Selection;
+use std::sync::Mutex;
 use tokio::sync::watch;
 
 /// 마지막으로 끝난 감지 결과. 앱 시작 감지가 끝나기 전에는 `None`이다.
@@ -51,6 +53,41 @@ impl HookInstallState {
     /// 끝난 설치 결과로 보관한 결과를 바꾼다.
     pub fn publish(&self, installation: HookInstallation) {
         self.latest.send_replace(Some(installation));
+    }
+}
+
+/// 시작 설정에서 고른 에이전트와 모델. 이번 실행에서 다음을 누르기 전에는 `None`이다.
+/// 파일 저장은 명령이 맡고, 여기에는 이번 실행에서 고른 값만 둔다.
+pub struct SelectionState {
+    current: Mutex<Option<Selection>>,
+}
+
+impl SelectionState {
+    pub fn new() -> Self {
+        Self {
+            current: Mutex::new(None),
+        }
+    }
+
+    /// 이번 실행에서 고른 값.
+    pub fn get(&self) -> Option<Selection> {
+        self.current.lock().ok().and_then(|current| current.clone())
+    }
+
+    /// 고른 값을 바꾼다.
+    pub fn set(&self, selection: Selection) {
+        if let Ok(mut current) = self.current.lock() {
+            *current = Some(selection);
+        }
+    }
+}
+
+/// 창 전환을 한 번에 하나만 하게 하는 잠금. 다음 버튼을 연달아 눌러도 작은 창이 하나만 열린다.
+pub struct WindowSwitch(pub tokio::sync::Mutex<()>);
+
+impl WindowSwitch {
+    pub fn new() -> Self {
+        Self(tokio::sync::Mutex::new(()))
     }
 }
 
@@ -236,5 +273,33 @@ mod hook_install_state_tests {
 
         assert_eq!(got, Ok(Some(first_install())));
         assert_eq!(state.latest().await, Some(after_redetect()));
+    }
+}
+
+#[cfg(test)]
+mod selection_state_tests {
+    use super::*;
+    use crate::agent::domain::model::{AgentKind, Environment};
+
+    fn selection(model: &str) -> Selection {
+        Selection {
+            agent: AgentKind::Claude,
+            environment: Environment::Macos,
+            model: model.to_owned(),
+        }
+    }
+
+    #[test]
+    fn fr_start_006_nothing_before_next() {
+        assert_eq!(SelectionState::new().get(), None);
+    }
+
+    #[test]
+    fn fr_start_006_window_reads_value_set_on_next() {
+        let state = SelectionState::new();
+        state.set(selection("sonnet"));
+        state.set(selection("opus"));
+
+        assert_eq!(state.get(), Some(selection("opus")));
     }
 }

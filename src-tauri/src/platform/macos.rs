@@ -1,5 +1,3 @@
-use tauri::Manager;
-
 /// 창을 닫아도 앱은 종료하지 않고 창만 숨긴다. 종료는 Cmd+Q로 한다.
 pub fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -8,17 +6,14 @@ pub fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
     }
 }
 
-/// 독 아이콘을 클릭했을 때 보이는 창이 없으면 숨긴 창을 다시 띄운다.
+/// 독 아이콘을 클릭했을 때 보이는 창이 없으면 지금 쓰는 창(작은 창이나 시작 설정 창)을 다시 띄운다.
 pub fn on_run_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
     if let tauri::RunEvent::Reopen {
         has_visible_windows: false,
         ..
     } = event
     {
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
+        crate::window::show_current(app);
     }
 }
 
@@ -145,4 +140,62 @@ pub async fn hook_target(
         },
         NativeFs,
     ))
+}
+
+// ---------------------------------------------------------------- 모델 목록 조회
+
+use crate::model::host::{ModelHost, CLAUDE_INIT_ARGS, CLAUDE_INIT_SETTINGS, CODEX_MODELS_ARGS};
+
+/// macOS의 모델 목록 조회. 감지와 같은 로그인 셸 `PATH`로 실행해 npm으로 설치한 CLI가 `node`를 찾게 한다.
+pub struct ModelCli {
+    path_env: String,
+    home: PathBuf,
+}
+
+impl ModelCli {
+    /// 감지 때 읽어 둔 로그인 셸 `PATH`를 쓴다. 아직 없으면 셸을 다시 띄우지 않고 앱의 `PATH`만 쓴다.
+    /// 셸을 띄우면 조회 시간 상한(SC-START-001) 밖에서 몇 초가 더 걸릴 수 있기 때문이다.
+    pub async fn new() -> Self {
+        let app_path = std::env::var("PATH").unwrap_or_default();
+        let shell_path = SHELL_PATH.lock().ok().and_then(|path| path.clone());
+        Self {
+            path_env: shell_path.map_or(app_path.clone(), |path| format!("{path}:{app_path}")),
+            home: std::env::var_os("HOME")
+                .map(PathBuf::from)
+                .unwrap_or_default(),
+        }
+    }
+
+    fn command(&self, path: &str) -> Command {
+        let mut command = Command::new(path);
+        command.env("PATH", &self.path_env).current_dir(&self.home);
+        command
+    }
+}
+
+impl ModelHost for ModelCli {
+    async fn claude_init<T: Send>(
+        &self,
+        _environment: &Environment,
+        path: &str,
+        request: &str,
+        accept: impl Fn(&str) -> Option<T> + Send + Sync,
+    ) -> Option<T> {
+        let mut command = self.command(path);
+        command.args(CLAUDE_INIT_ARGS).arg(CLAUDE_INIT_SETTINGS);
+        process::request_line(command, request, accept).await
+    }
+
+    async fn codex_models(&self, _environment: &Environment, path: &str) -> Option<String> {
+        let mut command = self.command(path);
+        command.args(CODEX_MODELS_ARGS);
+        let output = process::run_tree(command, crate::model::query::MODEL_QUERY_LIMIT).await?;
+        process::stdout_text(&output)
+    }
+
+    async fn codex_config(&self, _environment: &Environment) -> Option<String> {
+        tokio::fs::read_to_string(self.home.join(".codex").join("config.toml"))
+            .await
+            .ok()
+    }
 }

@@ -1,10 +1,16 @@
 import { getTauriVersion, getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ResultAsync } from 'neverthrow';
+import type { AgentKind } from '@renderer/types/bindings/AgentKind';
 import type { Detection } from '@renderer/types/bindings/Detection';
+import type { Environment } from '@renderer/types/bindings/Environment';
 import type { HookEvent } from '@renderer/types/bindings/HookEvent';
 import type { HookInstallation } from '@renderer/types/bindings/HookInstallation';
+import type { ModelList } from '@renderer/types/bindings/ModelList';
+import type { OnboardingError } from '@renderer/types/bindings/OnboardingError';
+import type { Selection } from '@renderer/types/bindings/Selection';
 import { HOOK_EVENT, HOOK_INSTALLATION } from '@renderer/types/ipc';
 
 /** Rust 명령 에러가 아닌 IPC 실패. 없는 명령이나 인자 모양 불일치처럼 Tauri가 문자열로 reject할 때 쓴다. */
@@ -47,4 +53,15 @@ export const api = {
     handler: (installation: HookInstallation) => void,
   ): ResultAsync<UnlistenFn, IpcError> =>
     call(listen<HookInstallation>(HOOK_INSTALLATION, (message) => handler(message.payload))),
+  /** 한 에이전트와 실행 환경의 모델 목록. 조회가 실패하거나 5초를 넘기면 고정 목록이 온다. */
+  getAgentModels: (agent: AgentKind, environment: Environment): ResultAsync<ModelList, IpcError> =>
+    call(invoke('agent_models', { agent, environment })),
+  /** 지난번에 고른 에이전트와 모델. 없으면 undefined다. */
+  getSavedSelection: (): ResultAsync<Selection | undefined, IpcError> =>
+    call(invoke<Selection | null>('saved_selection')).map((saved) => saved ?? undefined),
+  /** 작은 창을 연 뒤 고른 값을 저장하고 시작 설정 창을 닫는다. 작은 창을 열지 못하면 아무것도 바꾸지 않는다. */
+  finishOnboarding: (selection: Selection): ResultAsync<void, OnboardingError | IpcError> =>
+    call<void, OnboardingError>(invoke('finish_onboarding', { selection })),
+  /** 누르고 있는 마우스로 지금 창을 끌기 시작한다. 테두리 없는 작은 창에서 쓴다. */
+  startWindowDrag: (): ResultAsync<void, IpcError> => call(getCurrentWindow().startDragging()),
 };

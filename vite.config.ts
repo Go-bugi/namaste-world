@@ -37,6 +37,13 @@ export default defineConfig(({ command }) => ({
     target: platform === 'windows' ? 'chrome105' : 'safari13',
     minify: isDebug ? false : 'esbuild',
     sourcemap: isDebug,
+    // 창마다 HTML 진입점이 하나씩 있다. index.html은 작은 창(main), onboarding.html은 시작 설정 창이다
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'src/renderer/index.html'),
+        onboarding: resolve(__dirname, 'src/renderer/onboarding.html'),
+      },
+    },
   },
   // Vitest: 경로는 root(src/renderer) 기준. 테스트 파일은 소스 옆에 *.test.ts(x)로 둔다
   test: {

@@ -80,7 +80,7 @@ src-tauri/
     events.rs           # 이벤트 이름 상수
     commands/           # #[tauri::command] 함수
     tasks/              # 계속 도는 백그라운드 작업. setup에서 띄움
-    window/<창 이름>.rs  # 그 창의 이벤트 처리와 설정 코드. 할 일이 없으면 만들지 않음
+    window/<창 이름>.rs  # 그 창을 만들고 띄우는 코드, 이벤트 처리와 설정. 할 일이 없으면 만들지 않음
     platform/           # OS별 코드 (macos.rs, windows.rs)와 로직 모듈 trait의 OS 구현 (fs.rs)
     tray.rs
     ai/, db/ …          # 앱 로직 모듈
@@ -105,7 +105,7 @@ src-tauri/
 - `scene/`과 `features/`는 서로 import하지 않습니다. 둘이 같이 쓰는 상태는 `stores/`에 둡니다.
 - 기능 하나에서만 쓰는 코드와 store는 `features/<기능>/` 안에 둡니다. 두 기능 이상이 쓰게 되면 코드는 `shared/`로, store는 `stores/`로 옮깁니다.
 - `hooks/`, `utils/`, `constants/` 같은 최상위 폴더는 만들지 않습니다. 기능 폴더나 `shared/` 안에 둡니다.
-- Rust는 shell(`commands/`, `tasks/`, `lib.rs`의 `setup`)이 로직 모듈(`ai/`, `db/` 등)을 부르는 방향으로만 의존합니다. 로직 모듈은 `tauri`를 import하지 않습니다. 계산은 IO 없는 함수로 두고, 파일이나 DB에 접근하는 코드는 계산 쪽이 정의한 trait을 구현하는 모듈(`db/` 등)에 둡니다. 구현이 OS마다 다르면 `platform/`에 둡니다(`hook::fs::ConfigFs`를 구현한 `platform/fs.rs`).
+- Rust는 shell(`commands/`, `tasks/`, `window/`, `lib.rs`의 `setup`)이 로직 모듈(`ai/`, `db/` 등)을 부르는 방향으로만 의존합니다. 로직 모듈은 `tauri`를 import하지 않습니다. 계산은 IO 없는 함수로 두고, 파일이나 DB에 접근하는 코드는 계산 쪽이 정의한 trait을 구현하는 모듈(`db/` 등)에 둡니다. 구현이 OS마다 다르면 `platform/`에 둡니다(`hook::fs::ConfigFs`를 구현한 `platform/fs.rs`).
   - 결과를 다시 계산에 쓰지 않는 IO는 명령 안에서 해도 됩니다. 계산 결과를 파일에 한 번 쓰고 끝나는 경우가 그렇습니다. IO 결과에 따라 계산이 달라지거나 같은 IO를 여러 명령이 쓰면 모듈로 빼고 trait으로 받습니다.
 - `#[cfg(target_os = ...)]` 코드는 `platform/`에만 둡니다.
 - 이벤트 이름은 `events.rs`와 `types/ipc.ts`에 같은 이름의 상수로 둡니다. payload 타입은 그 값을 만드는 로직 모듈에 정의하고 ts-rs로 내보냅니다(`HookEvent`는 `hook::domain::model`).
@@ -125,15 +125,15 @@ renderer와 주고받는 타입은 Rust에 정의하고 [ts-rs](https://github.c
 
 ### 창 추가하기
 
-창을 하나 추가할 때는 아래 다섯 곳을 함께 고칩니다. 창은 `tauri.conf.json`의 `app.windows`로 선언하고 OS별 창 동작은 `platform/`에 둡니다.
+창을 하나 추가할 때는 아래 다섯 곳을 함께 고칩니다. 앱을 켜면 바로 여는 창은 `tauri.conf.json`의 `app.windows`에 선언하고, 실행 중에 여는 창은 `window/<창 이름>.rs`에서 `WebviewWindowBuilder`로 만듭니다(작은 창 `main`). OS별 창 동작은 `platform/`에 둡니다.
 
-| 위치                        | 추가할 것                                       |
-| --------------------------- | ----------------------------------------------- |
-| `src/renderer/`             | `<창 이름>.html`, `src/windows/<창 이름>/`      |
-| `vite.config.ts`            | `build.rollupOptions.input`에 HTML 등록         |
-| `src-tauri/tauri.conf.json` | `app.windows`에 창 `label`과 `url`              |
-| `src-tauri/src/window/`     | `<창 이름>.rs`. 그 창만의 Rust 코드가 있을 때만 |
-| `src-tauri/capabilities/`   | `<창 이름>.json`. 그 창에 필요한 권한만 넣음    |
+| 위치                        | 추가할 것                                                                 |
+| --------------------------- | ------------------------------------------------------------------------- |
+| `src/renderer/`             | `<창 이름>.html`, `src/windows/<창 이름>/`                                |
+| `vite.config.ts`            | `build.rollupOptions.input`에 HTML 등록                                   |
+| `src-tauri/tauri.conf.json` | 앱을 켜면 바로 여는 창만. `app.windows`에 창 `label`과 `url`              |
+| `src-tauri/src/window/`     | `<창 이름>.rs`. 실행 중에 만드는 창이거나 그 창만의 Rust 코드가 있을 때만 |
+| `src-tauri/capabilities/`   | `<창 이름>.json`. 그 창에 필요한 권한만 넣음                              |
 
 ## 문서와 주석
 
