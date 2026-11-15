@@ -1,50 +1,17 @@
 import { lazy, Suspense } from 'react';
-import Versions from '@renderer/features/versions/Versions';
-import AgentDetectionPanel from '@renderer/features/agent-detection/AgentDetectionPanel';
-import HookEventsPanel from '@renderer/features/hook-events/HookEventsPanel';
-import logo from '@renderer/assets/logo.png';
-import { api } from '@renderer/api';
+import WindowDragArea from '@renderer/features/window-drag/WindowDragArea';
 
 // three가 커서 첫 화면 번들과 분리한다
-const DemoScene = lazy(() => import('@renderer/scene/DemoScene'));
+const TestScene = lazy(() => import('@renderer/scene/TestScene'));
 
+/** 작은 창. 끌어 옮길 수 있는 투명한 영역 위에 시험용 3D를 둔다. */
 function App(): React.JSX.Element {
-  const ipcHandle = (): void => {
-    void api.ping().match(
-      () => undefined,
-      (e) => console.error('ping 실패', e),
-    );
-  };
-
   return (
-    <>
-      <Suspense fallback={<img alt="logo" className="logo" src={logo} />}>
-        <DemoScene />
+    <WindowDragArea>
+      <Suspense fallback={<div className="test-scene-loading">불러오는 중…</div>}>
+        <TestScene />
       </Suspense>
-      <div className="creator">Powered by Tauri + Vite</div>
-      <div className="text">
-        Build a Tauri app with <span className="react">React</span>
-        &nbsp;and <span className="ts">TypeScript</span>
-      </div>
-      <p className="tip">
-        Right-click and choose <code>Inspect</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <a href="https://v2.tauri.app/start/" target="_blank" rel="noreferrer">
-            Documentation
-          </a>
-        </div>
-        <div className="action">
-          <a target="_blank" rel="noreferrer" onClick={ipcHandle}>
-            Send IPC
-          </a>
-        </div>
-      </div>
-      <AgentDetectionPanel />
-      <HookEventsPanel />
-      <Versions></Versions>
-    </>
+    </WindowDragArea>
   );
 }
 

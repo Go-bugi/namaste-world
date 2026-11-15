@@ -1,0 +1,93 @@
+@import './base.css';
+
+body {
+  user-select: none;
+}
+
+.onboarding {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.onboarding h1 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.onboarding-step {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--color-background-soft);
+}
+
+.onboarding-step header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.onboarding-step h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.onboarding-step[data-status='pending'] {
+  opacity: 0.5;
+}
+
+.onboarding-status {
+  font-size: 12px;
+  color: var(--ev-c-text-2);
+}
+
+.onboarding-step header button {
+  margin-left: auto;
+}
+
+.onboarding-step li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 22px;
+}
+
+.onboarding-detail {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--ev-c-text-3);
+  overflow-wrap: anywhere;
+}
+
+.onboarding-error {
+  font-size: 13px;
+  color: #ff8a80;
+}
+
+.onboarding-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.onboarding-fields label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.onboarding-fields select {
+  flex: 1;
+  min-width: 0;
+}
+
+.onboarding-actions {
+  display: flex;
+  justify-content: flex-end;
+}
