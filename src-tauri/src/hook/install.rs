@@ -51,6 +51,9 @@ async fn install_files<F: ConfigFs>(
     shell: ShellFamily,
 ) -> Result<bool, InstallFailure> {
     let path = |parts: &[&str]| join(shell, &target.home, parts);
+    // 설정 폴더가 바뀌어도 이전 폴더의 앱 훅은 그대로 둔다. 지금 폴더에만 설치한다
+    let claude = |file: &str| join(shell, &target.claude_dir, &[file]);
+    let codex = |file: &str| join(shell, &target.codex_dir, &[file]);
     let desired: Vec<(&str, Value)> = hook_events(target.agent, &target.version)
         .into_iter()
         .map(|event| (event, hook_handler(target, shell, event)))
@@ -77,15 +80,15 @@ async fn install_files<F: ConfigFs>(
 
     match target.agent {
         AgentKind::Claude => {
-            let settings = path(&[".claude", "settings.json"]);
+            let settings = claude("settings.json");
             let current = read(fs, &settings).await?;
             let merge = merge_claude_settings(current.as_deref(), &desired)
                 .map_err(|error| merge_failure(error, &settings))?;
             push_update(&mut writes, settings, merge);
         }
         AgentKind::Codex => {
-            let hooks_json = path(&[".codex", "hooks.json"]);
-            let config_toml = path(&[".codex", "config.toml"]);
+            let hooks_json = codex("hooks.json");
+            let config_toml = codex("config.toml");
             let current_hooks = read(fs, &hooks_json).await?;
             let current_config = read(fs, &config_toml).await?;
             let (hooks_merge, slots) = merge_codex_hooks(current_hooks.as_deref(), &desired)
@@ -122,13 +125,13 @@ async fn read<F: ConfigFs>(fs: &F, path: &str) -> Result<Option<String>, Install
         .map_err(|error| io_failure(&error, path))
 }
 
-/// 그 환경의 경로 표기로 홈 아래 경로를 만든다.
-fn join(shell: ShellFamily, home: &str, parts: &[&str]) -> String {
+/// 그 환경의 경로 표기로 폴더 아래 경로를 만든다.
+fn join(shell: ShellFamily, dir: &str, parts: &[&str]) -> String {
     let separator = match shell {
         ShellFamily::Posix => "/",
         ShellFamily::Windows => "\\",
     };
-    std::iter::once(home)
+    std::iter::once(dir)
         .chain(parts.iter().copied())
         .collect::<Vec<_>>()
         .join(separator)
@@ -288,6 +291,8 @@ mod tests {
             environment: Environment::Macos,
             version: version.to_string(),
             home: MAC_HOME.to_string(),
+            claude_dir: format!("{MAC_HOME}/.claude"),
+            codex_dir: format!("{MAC_HOME}/.codex"),
             endpoint_path: format!("{MAC_HOME}/.namaste-world/endpoint"),
         }
     }
@@ -300,6 +305,8 @@ mod tests {
             },
             version: version.to_string(),
             home: WSL_HOME.to_string(),
+            claude_dir: format!("{WSL_HOME}/.claude"),
+            codex_dir: format!("{WSL_HOME}/.codex"),
             endpoint_path: "/mnt/c/Users/홍 길동/.namaste-world/endpoint".to_string(),
         }
     }
@@ -310,6 +317,8 @@ mod tests {
             environment: Environment::Windows,
             version: version.to_string(),
             home: WIN_HOME.to_string(),
+            claude_dir: format!("{WIN_HOME}\\.claude"),
+            codex_dir: format!("{WIN_HOME}\\.codex"),
             endpoint_path: format!("{WIN_HOME}\\.namaste-world\\endpoint"),
         }
     }
@@ -1163,5 +1172,102 @@ mod tests {
                 "{target:?}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn fr_hook_002_claude_config_dir_from_shell_gets_the_hook_and_home_claude_is_untouched() {
+        let p = posix_paths(MAC_HOME);
+        let work_settings = format!("{MAC_HOME}/work-claude/settings.json");
+        let home_settings = r#"{"theme":"dark"}"#;
+        let fs = MemFs::with(&[(&p.claude_settings, home_settings)]);
+        let target = InstallTarget {
+            claude_dir: format!("{MAC_HOME}/work-claude"),
+            ..mac(AgentKind::Claude, CLAUDE_VERSION)
+        };
+
+        let status = install(&fs, &target, ShellFamily::Posix).await;
+
+        assert_eq!(status, InstallStatus::Installed);
+        assert_eq!(
+            fs.written_paths(),
+            vec![p.script.clone(), work_settings.clone()]
+        );
+        assert_hooks_registered(
+            &fs.get(&work_settings).unwrap(),
+            &target,
+            ShellFamily::Posix,
+        );
+        assert_eq!(fs.get(&p.claude_settings).as_deref(), Some(home_settings));
+    }
+
+    #[tokio::test]
+    async fn fr_hook_002_wsl_codex_home_from_bashrc_gets_the_hook() {
+        let p = posix_paths(WSL_HOME);
+        let dir = format!("{WSL_HOME}/codex-work");
+        let target = InstallTarget {
+            codex_dir: dir.clone(),
+            ..wsl(AgentKind::Codex, CODEX_VERSION)
+        };
+        let fs = MemFs::default();
+
+        let status = install(&fs, &target, ShellFamily::Posix).await;
+
+        assert_eq!(status, InstallStatus::Installed);
+        assert_eq!(
+            fs.written_paths(),
+            vec![
+                p.script.clone(),
+                format!("{dir}/config.toml"),
+                format!("{dir}/hooks.json"),
+            ]
+        );
+        assert!(fs.get(&p.codex_hooks).is_none());
+        assert!(fs.get(&p.codex_config).is_none());
+    }
+
+    #[tokio::test]
+    async fn fr_hook_002_windows_without_codex_home_installs_under_userprofile_codex() {
+        let p = windows_paths(WIN_HOME);
+        let fs = MemFs::default();
+
+        let status = install(
+            &fs,
+            &win(AgentKind::Codex, CODEX_VERSION),
+            ShellFamily::Windows,
+        )
+        .await;
+
+        assert_eq!(status, InstallStatus::Installed);
+        assert_eq!(
+            fs.written_paths(),
+            vec![
+                p.script.clone(),
+                p.codex_config.clone(),
+                p.codex_hooks.clone()
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn fr_hook_002_changed_config_dir_installs_there_and_keeps_old_app_hook() {
+        let p = posix_paths(MAC_HOME);
+        let fs = MemFs::default();
+        let before = mac(AgentKind::Claude, CLAUDE_VERSION);
+        install(&fs, &before, ShellFamily::Posix).await;
+        let old_settings = fs.get(&p.claude_settings).unwrap();
+        let after = InstallTarget {
+            claude_dir: format!("{MAC_HOME}/work-claude"),
+            ..before.clone()
+        };
+        let work_settings = format!("{MAC_HOME}/work-claude/settings.json");
+        fs.clear_log();
+
+        let status = install(&fs, &after, ShellFamily::Posix).await;
+
+        assert_eq!(status, InstallStatus::Installed);
+        assert_eq!(fs.written_paths(), vec![work_settings.clone()]);
+        assert_hooks_registered(&fs.get(&work_settings).unwrap(), &after, ShellFamily::Posix);
+        assert_eq!(fs.get(&p.claude_settings), Some(old_settings.clone()));
+        assert_hooks_registered(&old_settings, &before, ShellFamily::Posix);
     }
 }

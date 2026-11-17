@@ -1,6 +1,7 @@
 use crate::agent::domain::model::Detection;
 use crate::hook::domain::model::HookInstallation;
 use crate::model::domain::model::Selection;
+use crate::shell::model::{ShellEnv, ShellKind};
 use std::sync::Mutex;
 use tokio::sync::watch;
 
@@ -82,6 +83,44 @@ impl SelectionState {
     }
 }
 
+/// 마지막으로 읽은 셸 환경과 그 셸. 감지가 끝날 때만 바뀐다. 디스크에 쓰지 않는다(FR-AGENT-015, FR-AGENT-017).
+pub struct ShellEnvState {
+    current: Mutex<Option<(ShellKind, ShellEnv)>>,
+}
+
+impl ShellEnvState {
+    pub fn new() -> Self {
+        Self {
+            current: Mutex::new(None),
+        }
+    }
+
+    /// 감지에 쓴 셸과 환경으로 바꾼다.
+    pub fn set(&self, shell: ShellKind, env: ShellEnv) {
+        if let Ok(mut current) = self.current.lock() {
+            *current = Some((shell, env));
+        }
+    }
+
+    /// 마지막으로 읽은 환경. 아직 없으면 `app`(앱이 받은 환경)을 준다. 셸을 띄우지 않는다.
+    pub fn env_or(&self, app: impl FnOnce() -> ShellEnv) -> ShellEnv {
+        let read = self
+            .current
+            .lock()
+            .ok()
+            .and_then(|current| current.as_ref().map(|(_, env)| env.clone()));
+        read.unwrap_or_else(app)
+    }
+
+    /// 마지막 감지에 쓴 셸. 아직 감지하지 않았으면 None.
+    pub fn shell(&self) -> Option<ShellKind> {
+        self.current
+            .lock()
+            .ok()
+            .and_then(|current| current.as_ref().map(|(shell, _)| *shell))
+    }
+}
+
 /// 창 전환을 한 번에 하나만 하게 하는 잠금. 다음 버튼을 연달아 눌러도 작은 창이 하나만 열린다.
 pub struct WindowSwitch(pub tokio::sync::Mutex<()>);
 
@@ -112,6 +151,7 @@ mod tests {
                     status: codex,
                 },
             ],
+            shell_env_failure: None,
         }
     }
 
@@ -301,5 +341,66 @@ mod selection_state_tests {
         state.set(selection("opus"));
 
         assert_eq!(state.get(), Some(selection("opus")));
+    }
+}
+
+#[cfg(test)]
+mod shell_env_state_tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    fn env(pairs: &[(&str, &str)]) -> ShellEnv {
+        ShellEnv::new(
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect::<BTreeMap<_, _>>(),
+        )
+    }
+
+    fn app_env() -> ShellEnv {
+        env(&[("PATH", "/usr/bin:/bin")])
+    }
+
+    #[test]
+    fn fr_agent_015_no_shell_before_first_detection() {
+        assert_eq!(ShellEnvState::new().shell(), None);
+    }
+
+    #[test]
+    fn fr_agent_015_without_read_env_uses_app_env() {
+        let state = ShellEnvState::new();
+
+        assert_eq!(state.env_or(app_env), app_env());
+    }
+
+    #[test]
+    fn fr_agent_015_scenario_2_after_detection_uses_read_env_without_launching_shell() {
+        let state = ShellEnvState::new();
+        let read = env(&[
+            ("PATH", "/opt/homebrew/bin:/usr/bin"),
+            ("CLAUDE_CONFIG_DIR", "/w"),
+        ]);
+        state.set(ShellKind::PowerShell, read.clone());
+
+        let got = state.env_or(|| panic!("읽은 환경이 있으면 앱 환경을 만들지 않는다"));
+
+        assert_eq!(got, read);
+        assert_eq!(state.shell(), Some(ShellKind::PowerShell));
+    }
+
+    #[test]
+    fn fr_agent_015_scenario_1_redetection_replaces_env_and_shell() {
+        let state = ShellEnvState::new();
+        state.set(ShellKind::PowerShell, env(&[("PATH", "/usr/bin")]));
+        let after = env(&[
+            ("PATH", "/usr/bin"),
+            ("CLAUDE_CONFIG_DIR", "/Users/a/work-claude"),
+        ]);
+
+        state.set(ShellKind::GitBash, after.clone());
+
+        assert_eq!(state.env_or(app_env), after);
+        assert_eq!(state.shell(), Some(ShellKind::GitBash));
     }
 }

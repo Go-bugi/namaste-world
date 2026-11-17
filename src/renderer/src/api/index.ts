@@ -12,6 +12,8 @@ import type { LoginStatus } from '@renderer/types/bindings/LoginStatus';
 import type { ModelList } from '@renderer/types/bindings/ModelList';
 import type { OnboardingError } from '@renderer/types/bindings/OnboardingError';
 import type { Selection } from '@renderer/types/bindings/Selection';
+import type { ShellKind } from '@renderer/types/bindings/ShellKind';
+import type { ShellSetup } from '@renderer/types/bindings/ShellSetup';
 import { HOOK_EVENT, HOOK_INSTALLATION } from '@renderer/types/ipc';
 
 /** Rust 명령 에러가 아닌 IPC 실패. 없는 명령이나 인자 모양 불일치처럼 Tauri가 문자열로 reject할 때 쓴다. */
@@ -71,6 +73,17 @@ export const api = {
   /** 작은 창을 연 뒤 고른 값을 저장하고 시작 설정 창을 닫는다. 작은 창을 열지 못하면 아무것도 바꾸지 않는다. */
   finishOnboarding: (selection: Selection): ResultAsync<void, OnboardingError | IpcError> =>
     call<void, OnboardingError>(invoke('finish_onboarding', { selection })),
+  /** 셸 선택 단계의 선택지와 미리 고를 셸. 셸을 고르지 않는 OS(macOS)는 undefined다. */
+  getShellSetup: (): ResultAsync<ShellSetup | undefined, IpcError> =>
+    call(invoke<ShellSetup | null>('shell_setup')).map((setup) => setup ?? undefined),
+  /** 고른 셸을 앱 데이터 폴더에 바로 저장한다. 감지는 하지 않는다. */
+  setShell: (shell: ShellKind): ResultAsync<void, IpcError> => call(invoke('set_shell', { shell })),
+  /**
+   * 고른 셸의 환경으로 감지한다. 처음 부르면 앱 시작 감지가 되고, 마지막 감지와 셸이 같으면 보관한 결과가 온다.
+   * 셸이 다르면 다시 감지하고(멈춘 WSL 배포판은 켜지 않음) 훅을 다시 설치한다.
+   */
+  detectWithShell: (shell: ShellKind): ResultAsync<Detection, IpcError> =>
+    call(invoke('detect_with_shell', { shell })),
   /** 누르고 있는 마우스로 지금 창을 끌기 시작한다. 테두리 없는 작은 창에서 쓴다. */
   startWindowDrag: (): ResultAsync<void, IpcError> => call(getCurrentWindow().startDragging()),
 };

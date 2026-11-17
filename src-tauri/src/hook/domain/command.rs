@@ -225,6 +225,8 @@ mod tests {
             environment: Environment::Macos,
             version: "1.0.0".into(),
             home: "/Users/a".into(),
+            claude_dir: "/Users/a/.claude".into(),
+            codex_dir: "/Users/a/.codex".into(),
             endpoint_path: "/Users/a/.namaste-world/endpoint".into(),
         }
     }
@@ -235,6 +237,8 @@ mod tests {
             environment: Environment::Windows,
             version: "1.0.0".into(),
             home: r"C:\Users\홍 길동".into(),
+            claude_dir: r"C:\Users\홍 길동\.claude".into(),
+            codex_dir: r"C:\Users\홍 길동\.codex".into(),
             endpoint_path: r"C:\Users\홍 길동\.namaste-world\endpoint".into(),
         }
     }

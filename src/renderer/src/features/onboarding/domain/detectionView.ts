@@ -2,6 +2,7 @@ import type { AgentEntry } from '@renderer/types/bindings/AgentEntry';
 import type { AgentStatus } from '@renderer/types/bindings/AgentStatus';
 import type { Detection } from '@renderer/types/bindings/Detection';
 import type { FailureReason } from '@renderer/types/bindings/FailureReason';
+import type { ShellEnvFailure } from '@renderer/types/bindings/ShellEnvFailure';
 import {
   agentEnvironmentKey,
   agentLabel,
@@ -108,4 +109,24 @@ export function panelReducer(state: PanelState, event: PanelEvent): PanelState {
 /** 다시 감지 버튼을 누를 수 있는가. 감지 중이거나 훅 설치 중이면 false다. FR-AGENT-008 */
 export function canRedetect(state: PanelState, installing: boolean): boolean {
   return !state.detecting && !installing;
+}
+
+/** 감지 결과의 셸 환경 실패 안내. 실패가 없으면 undefined. 이유 문구만 담는다. FR-AGENT-018 */
+export function shellEnvNotice(detection: Detection): string | undefined {
+  const failure = detection.shellEnvFailure;
+  if (failure === undefined) return undefined;
+  return `터미널 설정을 읽지 못해 터미널과 결과가 다를 수 있습니다 (${shellEnvFailureLabel(failure)})`;
+}
+
+function shellEnvFailureLabel(failure: ShellEnvFailure): string {
+  switch (failure) {
+    case 'timeout':
+      return '시간 초과';
+    case 'launchFailed':
+      return '셸을 열지 못함';
+    case 'exitedWithError':
+      return '셸 설정 오류';
+    case 'unreadableOutput':
+      return '결과를 읽지 못함';
+  }
 }

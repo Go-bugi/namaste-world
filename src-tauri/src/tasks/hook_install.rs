@@ -6,12 +6,14 @@ use crate::hook::domain::model::{
 };
 use crate::hook::install::install;
 use crate::platform;
-use crate::state::{AgentDetection, HookInstallState};
+use crate::shell::model::ShellEnv;
+use crate::state::{AgentDetection, HookInstallState, ShellEnvState};
 use futures_util::future::join_all;
 use tauri::{Emitter, Manager};
 
 /// 감지 결과에서 설치됨인 항목마다 훅을 설치한다. 대상끼리는 동시에 설치해 한 대상의 실패나 지연이 다른 대상을 막지 않는다.
-pub async fn install_all(detection: &Detection) -> HookInstallation {
+/// 설정 폴더는 감지 때 읽은 CLI 실행 환경(`env`)으로 정한다(FR-HOOK-002).
+pub async fn install_all(detection: &Detection, env: &ShellEnv) -> HookInstallation {
     let app_dir = platform::app_dir();
     let jobs = detection
         .entries
@@ -30,7 +32,7 @@ pub async fn install_all(detection: &Detection) -> HookInstallation {
                             message: "홈 폴더를 찾지 못했습니다".to_owned(),
                         },
                     },
-                    Some(dir) => match platform::hook_target(entry, version, &dir).await {
+                    Some(dir) => match platform::hook_target(entry, version, &dir, env).await {
                         Ok((target, fs)) => {
                             install(&fs, &target, ShellFamily::of(&target.environment)).await
                         }
@@ -56,7 +58,8 @@ static INSTALL_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 /// 설치하고 결과를 보관한 뒤 renderer에 알린다.
 pub async fn run(app: &tauri::AppHandle, detection: &Detection) {
     let _guard = INSTALL_LOCK.lock().await;
-    let installation = install_all(detection).await;
+    let env = app.state::<ShellEnvState>().env_or(platform::app_env);
+    let installation = install_all(detection, &env).await;
     app.state::<HookInstallState>()
         .publish(installation.clone());
     let _ = app.emit(HOOK_INSTALLATION, installation);

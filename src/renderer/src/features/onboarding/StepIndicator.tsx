@@ -1,6 +1,7 @@
 import type { StepId, StepIndicator as Indicator, StepStatus } from './domain/stepper';
 
 const STEP_LABEL: Record<StepId, string> = {
+  shell: '셸 선택',
   detect: '감지',
   install: '훅 설치',
   select: '에이전트와 모델',
@@ -15,7 +16,7 @@ const STATUS_LABEL: Record<StepStatus, string> = {
 
 type Props = { readonly items: readonly Indicator[] };
 
-/** 단계 표시줄. 네 단계를 순서대로 보여 주고 지금 단계와 각 단계의 진행 상태를 표시한다. */
+/** 단계 표시줄. 단계를 순서대로 보여 주고 지금 단계와 각 단계의 진행 상태를 표시한다. */
 function StepIndicator({ items }: Props): React.JSX.Element {
   return (
     <ol className="onboarding-stepper">

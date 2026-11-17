@@ -19,6 +19,49 @@ pub async fn run(mut command: Command, limit: Duration) -> Option<Output> {
         .ok()
 }
 
+/// 실행하지 못한 이유.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunError {
+    /// 프로그램을 띄우지 못했다.
+    LaunchFailed,
+    /// `limit` 안에 끝나지 않았다.
+    Timeout,
+}
+
+/// `run_tree`와 같지만 띄우기 실패와 시간 초과를 구분해 돌려주고, 종료 코드와 상관없이 출력을 준다.
+/// 셸 환경 읽기처럼 실패 이유를 화면에 알려야 하는 실행에 쓴다. stderr는 버린다.
+pub async fn run_checked(mut command: Command, limit: Duration) -> Result<Output, RunError> {
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
+    hide_console(&mut command);
+    own_group(&mut command);
+    let child = command.spawn().map_err(|_| RunError::LaunchFailed)?;
+    let mut tree = TreeGuard(child.id());
+    let output = tokio::time::timeout(limit, child.wait_with_output())
+        .await
+        .map_err(|_| RunError::Timeout)?
+        .map_err(|_| RunError::LaunchFailed)?;
+    // 정상으로 끝났으면 거둘 프로세스가 없다
+    tree.0 = None;
+    Ok(output)
+}
+
+/// 셸 실행 결과를 셸 환경 계산에 넘길 값으로 바꾼다.
+pub fn shell_run(result: Result<Output, RunError>) -> crate::shell::env::ShellRun {
+    use crate::shell::env::ShellRun;
+    match result {
+        Err(RunError::LaunchFailed) => ShellRun::LaunchFailed,
+        Err(RunError::Timeout) => ShellRun::Timeout,
+        Ok(output) => ShellRun::Exited {
+            success: output.status.success(),
+            stdout: output.stdout,
+        },
+    }
+}
+
 /// 성공한 출력의 stdout을 UTF-8 문자열로 돌려준다.
 pub fn stdout_text(output: &Output) -> Option<String> {
     output
@@ -166,3 +209,38 @@ fn kill_tree(pid: u32) {
 
 #[cfg(not(any(unix, windows)))]
 fn kill_tree(_pid: u32) {}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn fr_agent_016_missing_program_is_launch_failed() {
+        let command = Command::new("/nonexistent/namaste-shell");
+
+        let result = run_checked(command, Duration::from_secs(1)).await;
+
+        assert_eq!(result.err(), Some(RunError::LaunchFailed));
+    }
+
+    #[tokio::test]
+    async fn sc_agent_003_shell_past_limit_is_timeout() {
+        let mut command = Command::new("sleep");
+        command.arg("5");
+
+        let result = run_checked(command, Duration::from_millis(100)).await;
+
+        assert_eq!(result.err(), Some(RunError::Timeout));
+    }
+
+    #[tokio::test]
+    async fn fr_agent_018_error_exit_still_returns_output() {
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c", "printf out; exit 3"]);
+
+        let output = run_checked(command, Duration::from_secs(5)).await.unwrap();
+
+        assert!(!output.status.success());
+        assert_eq!(output.stdout, b"out");
+    }
+}

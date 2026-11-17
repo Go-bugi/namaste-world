@@ -5,14 +5,21 @@ import {
   navigation,
   nextStep,
   prevStep,
-  STEPS,
+  stepsFor,
   type StepId,
   type StepperInput,
 } from './stepper';
 
-/** 감지와 설치가 끝났고 아무것도 진행 중이 아닌 입력 */
+/** macOS 단계 순서 */
+const MAC: readonly StepId[] = ['detect', 'install', 'select', 'login'];
+/** Windows 단계 순서. 셸 선택이 맨 앞이다 */
+const WIN: readonly StepId[] = ['shell', 'detect', 'install', 'select', 'login'];
+
+/** macOS에서 감지와 설치가 끝났고 아무것도 진행 중이 아닌 입력 */
 const base: StepperInput = {
+  steps: MAC,
   current: 'detect',
+  shellConfirmed: false,
   detecting: false,
   hasInstalled: true,
   installing: false,
@@ -28,41 +35,96 @@ const at = (current: StepId, patch: Partial<StepperInput> = {}): StepperInput =>
   current,
 });
 
+/** Windows에서 셸을 확정했고 감지와 설치가 끝났으며 아무것도 진행 중이 아닌 입력 */
+const winAt = (current: StepId, patch: Partial<StepperInput> = {}): StepperInput =>
+  at(current, { steps: WIN, shellConfirmed: true, ...patch });
+
 const statusOf = (input: StepperInput, id: StepId) =>
   indicators(input).find((indicator) => indicator.id === id);
 
-const stepArb = fc.constantFrom<StepId>('detect', 'install', 'select', 'login');
+const stepsArb = fc.constantFrom(MAC, WIN);
 
-const inputArb: fc.Arbitrary<StepperInput> = fc.record({
-  current: stepArb,
-  detecting: fc.boolean(),
-  hasInstalled: fc.boolean(),
-  installing: fc.boolean(),
-  hasInstallation: fc.boolean(),
-  selectionReady: fc.boolean(),
-  loggedIn: fc.boolean(),
-  submitting: fc.boolean(),
+const inputArb: fc.Arbitrary<StepperInput> = stepsArb.chain((steps) =>
+  fc.record({
+    steps: fc.constant(steps),
+    current: fc.constantFrom(...steps),
+    // macOS에는 셸 단계가 없으므로 셸 확정 여부는 Windows에서만 의미가 있다
+    shellConfirmed: steps.includes('shell') ? fc.boolean() : fc.constant(false),
+    detecting: fc.boolean(),
+    hasInstalled: fc.boolean(),
+    installing: fc.boolean(),
+    hasInstallation: fc.boolean(),
+    selectionReady: fc.boolean(),
+    loggedIn: fc.boolean(),
+    submitting: fc.boolean(),
+  }),
+);
+
+/** 진행 중인 작업(감지, 훅 설치, 보관)이 없는 입력 */
+const idleInputArb = inputArb.map((input): StepperInput => ({
+  ...input,
+  detecting: false,
+  installing: false,
+  submitting: false,
+}));
+
+describe('stepsFor', () => {
+  it('FR-START-002 시나리오 1: macOS는 감지, 훅 설치, 선택, 로그인 확인의 네 단계다', () => {
+    expect(stepsFor(false)).toEqual(MAC);
+  });
+
+  it('FR-START-002 시나리오 7: Windows는 셸 선택을 맨 앞에 둔 다섯 단계다', () => {
+    expect(stepsFor(true)).toEqual(WIN);
+  });
+
+  it('FR-START-011 시나리오 3: macOS 단계에는 셸 선택이 없다', () => {
+    expect(stepsFor(false)).not.toContain('shell');
+  });
 });
 
 describe('nextStep, prevStep', () => {
-  it('FR-START-002: 감지, 훅 설치, 선택, 로그인 확인 순서로 다음 단계로 간다', () => {
-    expect(nextStep('detect')).toBe('install');
-    expect(nextStep('install')).toBe('select');
-    expect(nextStep('select')).toBe('login');
-    expect(nextStep('login')).toBeUndefined();
+  it('FR-START-002: macOS는 감지, 훅 설치, 선택, 로그인 확인 순서로 다음 단계로 간다', () => {
+    expect(nextStep(MAC, 'detect')).toBe('install');
+    expect(nextStep(MAC, 'install')).toBe('select');
+    expect(nextStep(MAC, 'select')).toBe('login');
+    expect(nextStep(MAC, 'login')).toBeUndefined();
   });
 
   it('FR-START-002 시나리오 6: 로그인 확인 단계에서 이전으로 가면 선택 단계다', () => {
-    expect(prevStep('login')).toBe('select');
-    expect(prevStep('select')).toBe('install');
-    expect(prevStep('install')).toBe('detect');
-    expect(prevStep('detect')).toBeUndefined();
+    expect(prevStep(MAC, 'login')).toBe('select');
+    expect(prevStep(MAC, 'select')).toBe('install');
+    expect(prevStep(MAC, 'install')).toBe('detect');
+    expect(prevStep(MAC, 'detect')).toBeUndefined();
   });
 
-  test.prop([stepArb])('FR-START-002: 다음으로 갔다가 이전으로 오면 원래 단계다', (step) => {
-    const next = nextStep(step);
-    if (next !== undefined) expect(prevStep(next)).toBe(step);
+  it('FR-START-002 시나리오 8: Windows의 셸 선택 단계 다음은 감지 단계다', () => {
+    expect(nextStep(WIN, 'shell')).toBe('detect');
+    expect(nextStep(WIN, 'detect')).toBe('install');
+    expect(nextStep(WIN, 'login')).toBeUndefined();
   });
+
+  it('FR-START-005 시나리오 10: Windows의 감지 단계 이전은 셸 선택 단계이고, 셸 선택 단계가 처음이다', () => {
+    expect(prevStep(WIN, 'detect')).toBe('shell');
+    expect(prevStep(WIN, 'shell')).toBeUndefined();
+  });
+
+  test.prop([stepsArb.chain((steps) => fc.tuple(fc.constant(steps), fc.constantFrom(...steps)))])(
+    'FR-START-002: 다음으로 갔다가 이전으로 오면 원래 단계다',
+    ([steps, step]) => {
+      const next = nextStep(steps, step);
+      if (next !== undefined) expect(prevStep(steps, next)).toBe(step);
+    },
+  );
+
+  test.prop([stepsArb.chain((steps) => fc.tuple(fc.constant(steps), fc.constantFrom(...steps)))])(
+    'FR-START-002: 다음 단계와 이전 단계는 단계 목록에서 바로 옆 단계다',
+    ([steps, step]) => {
+      const index = steps.indexOf(step);
+
+      expect(nextStep(steps, step)).toBe(steps[index + 1]);
+      expect(prevStep(steps, step)).toBe(index > 0 ? steps[index - 1] : undefined);
+    },
+  );
 });
 
 describe('indicators', () => {
@@ -73,6 +135,59 @@ describe('indicators', () => {
 
     expect(got.map((indicator) => indicator.id)).toEqual(['detect', 'install', 'select', 'login']);
     expect(got.map((indicator) => indicator.current)).toEqual([true, false, false, false]);
+  });
+
+  it('FR-START-002 시나리오 7: Windows에서 창이 열리면 다섯 단계가 순서대로 나오고 셸 선택 단계가 지금 단계다', () => {
+    const got = indicators(
+      winAt('shell', {
+        shellConfirmed: false,
+        hasInstalled: false,
+        hasInstallation: false,
+      }),
+    );
+
+    expect(got.map((indicator) => indicator.id)).toEqual([
+      'shell',
+      'detect',
+      'install',
+      'select',
+      'login',
+    ]);
+    expect(got.map((indicator) => indicator.current)).toEqual([true, false, false, false, false]);
+  });
+
+  it('FR-START-002 시나리오 7: Windows에서 셸을 확정하기 전에는 셸 선택이 진행 중이고 나머지 단계는 시작 전이다', () => {
+    // 감지는 셸 선택 단계에서 다음을 눌러야 시작한다(FR-START-013)
+    const input = winAt('shell', {
+      shellConfirmed: false,
+      hasInstalled: false,
+      hasInstallation: false,
+    });
+
+    expect(indicators(input).map((indicator) => indicator.status)).toEqual([
+      'running',
+      'pending',
+      'pending',
+      'pending',
+      'pending',
+    ]);
+  });
+
+  it('FR-START-002 시나리오 8: Windows 셸 선택 단계에서 다음을 누르면 셸 선택은 끝남, 감지 단계는 지금 단계다', () => {
+    const input = winAt('detect', {
+      detecting: true,
+      hasInstalled: false,
+      hasInstallation: false,
+    });
+
+    expect(statusOf(input, 'shell')?.status).toBe('done');
+    expect(statusOf(input, 'shell')?.current).toBe(false);
+    expect(statusOf(input, 'detect')?.current).toBe(true);
+    expect(statusOf(input, 'detect')?.status).toBe('running');
+  });
+
+  it('FR-START-011 시나리오 3: macOS 단계 표시줄에는 셸 선택 단계가 없다', () => {
+    expect(indicators(at('detect')).map((indicator) => indicator.id)).not.toContain('shell');
   });
 
   it('FR-START-002 시나리오 2: 앱 시작 감지 중에는 훅 설치, 선택, 로그인 확인 단계가 시작 전이다', () => {
@@ -142,12 +257,19 @@ describe('indicators', () => {
     );
   });
 
+  it('FR-START-002: Windows에서 셸을 확정한 뒤 셸 선택 단계로 돌아와도 셸 선택 단계는 끝남이다', () => {
+    const input = winAt('shell');
+
+    expect(statusOf(input, 'shell')?.status).toBe('done');
+    expect(statusOf(input, 'shell')?.current).toBe(true);
+  });
+
   test.prop([inputArb])(
-    'FR-START-002: 단계 표시줄에는 네 단계가 순서대로 나오고 지금 단계는 하나뿐이다',
+    'FR-START-002: 단계 표시줄에는 그 OS의 단계가 순서대로 나오고 지금 단계는 하나뿐이다',
     (input) => {
       const got = indicators(input);
 
-      expect(got.map((indicator) => indicator.id)).toEqual([...STEPS]);
+      expect(got.map((indicator) => indicator.id)).toEqual([...input.steps]);
       expect(got.filter((indicator) => indicator.current).map((indicator) => indicator.id)).toEqual(
         [input.current],
       );
@@ -161,6 +283,7 @@ describe('indicators', () => {
       const detecting: StepperInput = {
         ...input,
         current: 'detect',
+        shellConfirmed: input.steps.includes('shell'),
         detecting: true,
         installing: false,
         hasInstallation: false,
@@ -168,8 +291,9 @@ describe('indicators', () => {
         loggedIn: false,
       };
       const got = indicators(detecting);
+      const afterDetect = got.slice(got.findIndex((indicator) => indicator.id === 'detect') + 1);
 
-      expect(got.slice(1).map((indicator) => indicator.status)).toEqual([
+      expect(afterDetect.map((indicator) => indicator.status)).toEqual([
         'pending',
         'pending',
         'pending',
@@ -177,9 +301,18 @@ describe('indicators', () => {
     },
   );
 
-  /** TQ2 답: 각 단계의 일이 끝났는가 */
+  test.prop([inputArb])('FR-START-002: 셸 선택 단계는 셸을 확정했을 때만 끝남이다', (input) => {
+    const shell = statusOf(input, 'shell');
+    if (shell === undefined) return;
+
+    expect(shell.status === 'done').toBe(input.shellConfirmed);
+  });
+
+  /** TQ2 답: 각 단계의 일이 끝났는가. 셸 선택은 셸을 확정했을 때 끝난다 */
   const doneOf = (input: StepperInput, id: StepId): boolean => {
     switch (id) {
+      case 'shell':
+        return input.shellConfirmed;
       case 'detect':
         return !input.detecting;
       case 'install':
@@ -195,8 +328,13 @@ describe('indicators', () => {
   const workingOf = (input: StepperInput, id: StepId): boolean =>
     (id === 'detect' && input.detecting) || (id === 'install' && input.installing);
 
+  /** 셸을 확정하기 전의 Windows 감지 단계는 아직 시작하지 않았으므로 아래 두 속성에서 뺀다 */
+  const detectionStarted = (input: StepperInput, id: StepId): boolean =>
+    id !== 'detect' || !input.steps.includes('shell') || input.shellConfirmed;
+
   test.prop([inputArb])('FR-START-002: 일이 끝난 단계는 끝남이다', (input) => {
     for (const indicator of indicators(input)) {
+      if (!detectionStarted(input, indicator.id)) continue;
       expect(indicator.status === 'done').toBe(doneOf(input, indicator.id));
     }
   });
@@ -205,6 +343,7 @@ describe('indicators', () => {
     'FR-START-002: 끝나지 않은 단계는 지금 단계이거나 일이 진행 중이면 진행 중, 그 밖은 시작 전이다',
     (input) => {
       for (const indicator of indicators(input)) {
+        if (!detectionStarted(input, indicator.id)) continue;
         if (doneOf(input, indicator.id)) continue;
         expect(indicator.status).toBe(
           indicator.id === input.current || workingOf(input, indicator.id) ? 'running' : 'pending',
@@ -220,13 +359,17 @@ describe('navigation', () => {
       canPrev: false,
       canNext: false,
     });
+    expect(navigation(winAt('detect', { detecting: true }))).toEqual({
+      canPrev: false,
+      canNext: false,
+    });
   });
 
   it('FR-START-005 시나리오 2: 감지가 끝났고 설치됨인 항목이 없으면 다음 버튼은 비활성화된다', () => {
     expect(navigation(at('detect', { hasInstalled: false })).canNext).toBe(false);
   });
 
-  it('FR-START-005: 감지가 끝났고 설치됨인 항목이 있으면 감지 단계의 다음 버튼이 활성화된다', () => {
+  it('FR-START-005: macOS에서 감지가 끝났고 설치됨인 항목이 있으면 감지 단계의 다음 버튼만 활성화된다', () => {
     expect(navigation(at('detect'))).toEqual({ canPrev: false, canNext: true });
   });
 
@@ -276,6 +419,19 @@ describe('navigation', () => {
     );
   });
 
+  it('FR-START-005 시나리오 9: Windows 셸 선택 단계에서 다음 버튼은 활성화되고 이전 버튼은 비활성화된다', () => {
+    expect(
+      navigation(
+        winAt('shell', { shellConfirmed: false, hasInstalled: false, hasInstallation: false }),
+      ),
+    ).toEqual({ canPrev: false, canNext: true });
+  });
+
+  it('FR-START-005 시나리오 10: Windows 감지 단계에서 감지가 진행 중이 아니면 이전 버튼이 활성화된다', () => {
+    expect(navigation(winAt('detect')).canPrev).toBe(true);
+    expect(navigation(winAt('detect', { hasInstalled: false })).canPrev).toBe(true);
+  });
+
   test.prop([inputArb])(
     'FR-START-005: 훅 설치가 진행 중이면 어느 단계에서든 두 버튼 모두 비활성화된다',
     (input) => {
@@ -286,9 +442,29 @@ describe('navigation', () => {
     },
   );
 
-  test.prop([inputArb])('FR-START-005: 감지 단계에서는 이전 버튼이 늘 비활성화된다', (input) => {
-    expect(navigation({ ...input, current: 'detect' }).canPrev).toBe(false);
-  });
+  test.prop([inputArb])(
+    'FR-START-005: 첫 단계(macOS는 감지, Windows는 셸 선택)에서는 이전 버튼이 늘 비활성화된다',
+    (input) => {
+      const first = input.steps[0];
+      if (first === undefined) return;
+
+      expect(navigation({ ...input, current: first }).canPrev).toBe(false);
+    },
+  );
+
+  test.prop([idleInputArb])(
+    'FR-START-005: 진행 중인 작업이 없으면 첫 단계가 아닌 단계에서는 이전 버튼이 활성화된다',
+    (input) => {
+      expect(navigation(input).canPrev).toBe(input.current !== input.steps[0]);
+    },
+  );
+
+  test.prop([idleInputArb])(
+    'FR-START-005: 진행 중인 작업이 없으면 셸 선택 단계의 다음 버튼은 늘 활성화된다',
+    (input) => {
+      expect(navigation({ ...input, steps: WIN, current: 'shell' }).canNext).toBe(true);
+    },
+  );
 
   test.prop([inputArb])(
     'FR-START-005: 감지 단계의 다음 버튼은 감지 중이 아니고 설치됨 항목이 있을 때만 활성화된다',

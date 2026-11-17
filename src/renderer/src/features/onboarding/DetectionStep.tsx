@@ -7,10 +7,21 @@ type Props = {
   readonly detecting: boolean;
   readonly canRedetect: boolean;
   readonly onRedetect: () => void;
+  /** 셸 환경을 읽지 못했을 때의 안내. 없으면 undefined */
+  readonly notice?: string;
 };
 
-/** 감지 단계. 감지 결과를 에이전트와 실행 환경마다 한 줄씩 보여 주고 다시 감지 버튼을 둔다. */
-function DetectionStep({ result, detecting, canRedetect, onRedetect }: Props): React.JSX.Element {
+/**
+ * 감지 단계. 감지 결과를 에이전트와 실행 환경마다 한 줄씩 보여 주고 다시 감지 버튼을 둔다.
+ * 셸 환경을 읽지 못했으면 그 안내를 함께 보여 준다(FR-AGENT-018).
+ */
+function DetectionStep({
+  result,
+  detecting,
+  canRedetect,
+  onRedetect,
+  notice,
+}: Props): React.JSX.Element {
   return (
     <StepSection
       title="설치된 에이전트 감지"
@@ -21,6 +32,7 @@ function DetectionStep({ result, detecting, canRedetect, onRedetect }: Props): R
       }
     >
       {detecting && <p className="onboarding-status">확인 중…</p>}
+      {!detecting && notice && <p className="onboarding-error">{notice}</p>}
       {result && (
         <ul>
           {toRows(result).map((row) => (
