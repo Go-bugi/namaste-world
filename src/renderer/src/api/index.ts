@@ -8,6 +8,7 @@ import type { Detection } from '@renderer/types/bindings/Detection';
 import type { Environment } from '@renderer/types/bindings/Environment';
 import type { HookEvent } from '@renderer/types/bindings/HookEvent';
 import type { HookInstallation } from '@renderer/types/bindings/HookInstallation';
+import type { LoginStatus } from '@renderer/types/bindings/LoginStatus';
 import type { ModelList } from '@renderer/types/bindings/ModelList';
 import type { OnboardingError } from '@renderer/types/bindings/OnboardingError';
 import type { Selection } from '@renderer/types/bindings/Selection';
@@ -56,6 +57,14 @@ export const api = {
   /** 한 에이전트와 실행 환경의 모델 목록. 조회가 실패하거나 5초를 넘기면 고정 목록이 온다. */
   getAgentModels: (agent: AgentKind, environment: Environment): ResultAsync<ModelList, IpcError> =>
     call(invoke('agent_models', { agent, environment })),
+  /** 보관한 감지 결과로 훅을 다시 설치하고 새 설치 결과를 준다. 끝나면 설치 결과 이벤트도 온다. */
+  reinstallHooks: (): ResultAsync<HookInstallation, IpcError> => call(invoke('reinstall_hooks')),
+  /** 한 에이전트와 실행 환경의 로그인 상태. 알아내지 못하면 `failed`에 이유가 담겨 온다. */
+  getAgentLoginStatus: (
+    agent: AgentKind,
+    environment: Environment,
+  ): ResultAsync<LoginStatus, IpcError> =>
+    call(invoke('agent_login_status', { agent, environment })),
   /** 지난번에 고른 에이전트와 모델. 없으면 undefined다. */
   getSavedSelection: (): ResultAsync<Selection | undefined, IpcError> =>
     call(invoke<Selection | null>('saved_selection')).map((saved) => saved ?? undefined),

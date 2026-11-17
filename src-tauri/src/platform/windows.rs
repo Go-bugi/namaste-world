@@ -267,11 +267,11 @@ use crate::model::host::{ModelHost, CLAUDE_INIT_ARGS, CLAUDE_INIT_SETTINGS, CODE
 use crate::model::query::MODEL_QUERY_LIMIT;
 
 /// Windows의 모델 목록 조회. Windows 자체는 감지한 실행 파일을 바로, WSL 배포판은 `wsl.exe`로 실행한다.
-pub struct ModelCli {
+pub struct AgentCli {
     home: PathBuf,
 }
 
-impl ModelCli {
+impl AgentCli {
     pub async fn new() -> Self {
         Self {
             home: std::env::var_os("USERPROFILE")
@@ -299,7 +299,7 @@ impl ModelCli {
     }
 }
 
-impl ModelHost for ModelCli {
+impl ModelHost for AgentCli {
     async fn claude_init<T: Send>(
         &self,
         environment: &Environment,
@@ -373,5 +373,26 @@ impl ModelHost for ModelCli {
                     .ok()
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------- 로그인 상태 확인
+
+use crate::login::check::LOGIN_CHECK_LIMIT;
+use crate::login::host::{CliOutput, LoginHost};
+
+impl LoginHost for AgentCli {
+    async fn run(&self, environment: &Environment, path: &str, args: &[&str]) -> Option<CliOutput> {
+        let mut command = match environment {
+            Environment::Wsl { distro } => Self::wsl_exec(distro, path),
+            Environment::Windows | Environment::Macos => {
+                let mut command = Command::new(path);
+                command.current_dir(&self.home);
+                command
+            }
+        };
+        command.args(args);
+        let output = process::run_tree_capture(command, LOGIN_CHECK_LIMIT).await?;
+        Some(process::cli_output(&output))
     }
 }

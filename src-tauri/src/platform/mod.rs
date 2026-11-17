@@ -9,9 +9,9 @@ mod process;
 mod windows;
 
 #[cfg(target_os = "macos")]
-pub use macos::{app_dir, hook_target, on_run_event, on_window_event, AgentHost, ModelCli};
+pub use macos::{app_dir, hook_target, on_run_event, on_window_event, AgentCli, AgentHost};
 #[cfg(target_os = "windows")]
-pub use windows::{app_dir, hook_target, AgentHost, ModelCli};
+pub use windows::{app_dir, hook_target, AgentCli, AgentHost};
 
 /// 창 배치를 논리 좌표(포인트)로 계산하는가. macOS는 모니터 위치를 "논리 원점 × 그 모니터의 배율"로 주어
 /// 배율이 다른 모니터끼리 물리 좌표가 겹치므로 논리 좌표로 계산한다. Windows는 전역 물리 좌표가 하나라 그대로 쓴다.
@@ -30,7 +30,7 @@ pub fn on_run_event(_app: &tauri::AppHandle, _event: tauri::RunEvent) {}
 
 pub use fs::write_file;
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub use unsupported::{app_dir, hook_target, AgentHost, ModelCli};
+pub use unsupported::{app_dir, hook_target, AgentCli, AgentHost};
 
 /// macOS와 Windows가 아닌 OS. 확인할 환경이 없어 감지 결과가 비어 있다.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -69,15 +69,15 @@ mod unsupported {
     }
 
     /// 조회할 CLI가 없어 늘 실패한다. 고정 목록이 쓰인다.
-    pub struct ModelCli;
+    pub struct AgentCli;
 
-    impl ModelCli {
+    impl AgentCli {
         pub async fn new() -> Self {
             Self
         }
     }
 
-    impl crate::model::host::ModelHost for ModelCli {
+    impl crate::model::host::ModelHost for AgentCli {
         async fn claude_init<T: Send>(
             &self,
             _environment: &Environment,
@@ -93,6 +93,18 @@ mod unsupported {
         }
 
         async fn codex_config(&self, _environment: &Environment) -> Option<String> {
+            None
+        }
+    }
+
+    /// 실행할 CLI가 없어 늘 띄우지 못한 것으로 낸다.
+    impl crate::login::host::LoginHost for AgentCli {
+        async fn run(
+            &self,
+            _environment: &Environment,
+            _path: &str,
+            _args: &[&str],
+        ) -> Option<crate::login::host::CliOutput> {
             None
         }
     }

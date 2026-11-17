@@ -59,6 +59,35 @@ pub async fn run_tree(mut command: Command, limit: Duration) -> Option<Output> {
     output
 }
 
+/// `run_tree`와 같지만 stderr도 받고, 종료 코드와 상관없이 출력을 돌려준다.
+/// 로그인 상태 명령처럼 결과 문장을 stderr로 내거나 0이 아닌 코드로 끝나는 CLI에 쓴다.
+pub async fn run_tree_capture(mut command: Command, limit: Duration) -> Option<Output> {
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    hide_console(&mut command);
+    own_group(&mut command);
+    let child = command.spawn().ok()?;
+    let mut tree = TreeGuard(child.id());
+    let output = tokio::time::timeout(limit, child.wait_with_output())
+        .await
+        .ok()?
+        .ok();
+    // 정상으로 끝났으면 거둘 프로세스가 없다
+    tree.0 = None;
+    output
+}
+
+/// 출력을 로그인 확인용 `CliOutput`으로 바꾼다. 종료 코드는 담지 않는다.
+pub fn cli_output(output: &Output) -> crate::login::host::CliOutput {
+    crate::login::host::CliOutput {
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    }
+}
+
 /// 외부 프로그램을 띄워 표준 입력에 `input` 한 줄을 쓰고, stdout을 줄 단위로 읽다가 `accept`가 Some을 돌려주면 그 값을 준다.
 /// 응답 줄을 받을 때까지 stdin을 열어 둔다. 띄우지 못하거나 응답 전에 출력이 끝나면 None이다.
 /// 상한 시간은 부르는 쪽이 건다. 값을 받거나 이 future가 버려지면 프로세스 트리 전체를 죽인다.

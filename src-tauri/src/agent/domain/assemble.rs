@@ -1,6 +1,6 @@
 use super::model::{
-    AgentEntry, AgentKind, AgentStatus, EnvProbe, Environment, FailureReason, HostOs, Target,
-    Trigger,
+    AgentEntry, AgentKind, AgentStatus, Detection, EnvProbe, Environment, FailureReason, HostOs,
+    Target, Trigger,
 };
 use super::parse::parse_version;
 use std::path::{Path, PathBuf};
@@ -113,6 +113,25 @@ pub fn executable_names(os: HostOs, agent: AgentKind) -> Vec<String> {
         HostOs::Macos => vec![name.to_owned()],
         HostOs::Windows => vec![format!("{name}.exe"), format!("{name}.cmd")],
     }
+}
+
+/// 감지 결과에서 `agent`와 `environment`가 같고 설치됨인 항목의 실행 파일 경로. 없으면 None.
+pub fn installed_path(
+    detection: &Detection,
+    agent: AgentKind,
+    environment: &Environment,
+) -> Option<String> {
+    detection
+        .entries
+        .iter()
+        .find_map(|entry| match &entry.status {
+            AgentStatus::Installed { path, .. }
+                if entry.agent == agent && &entry.environment == environment =>
+            {
+                Some(path.clone())
+            }
+            _ => None,
+        })
 }
 
 #[cfg(test)]
@@ -513,6 +532,187 @@ mod tests {
                     expected
                 );
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod installed_path_tests {
+    use super::*;
+    use crate::agent::domain::model::FailureReason;
+    use proptest::prelude::*;
+
+    fn ubuntu() -> Environment {
+        Environment::Wsl {
+            distro: "Ubuntu".to_string(),
+        }
+    }
+
+    fn installed(path: &str) -> AgentStatus {
+        AgentStatus::Installed {
+            path: path.to_string(),
+            version: "1.0.0".to_string(),
+        }
+    }
+
+    fn entry(agent: AgentKind, environment: Environment, status: AgentStatus) -> AgentEntry {
+        AgentEntry {
+            agent,
+            environment,
+            status,
+        }
+    }
+
+    /// Windows의 Codex는 설치됨, WSL `Ubuntu`의 Codex는 다른 경로로 설치됨, macOS의 Claude Code는 설치되지 않음
+    fn sample() -> Detection {
+        Detection {
+            entries: vec![
+                entry(
+                    AgentKind::Claude,
+                    Environment::Macos,
+                    AgentStatus::NotInstalled,
+                ),
+                entry(
+                    AgentKind::Codex,
+                    Environment::Windows,
+                    installed("C:\\bin\\codex.exe"),
+                ),
+                entry(AgentKind::Codex, ubuntu(), installed("/usr/bin/codex")),
+            ],
+        }
+    }
+
+    #[test]
+    fn fr_agent_009_gives_path_of_installed_entry() {
+        assert_eq!(
+            installed_path(&sample(), AgentKind::Codex, &Environment::Windows),
+            Some("C:\\bin\\codex.exe".to_string())
+        );
+    }
+
+    #[test]
+    fn fr_agent_009_picks_path_of_the_requested_environment() {
+        // 같은 Codex라도 WSL `Ubuntu` 항목은 그 배포판 안의 경로다
+        assert_eq!(
+            installed_path(&sample(), AgentKind::Codex, &ubuntu()),
+            Some("/usr/bin/codex".to_string())
+        );
+    }
+
+    #[test]
+    fn fr_agent_009_other_distro_has_no_path() {
+        let debian = Environment::Wsl {
+            distro: "Debian".to_string(),
+        };
+        assert_eq!(installed_path(&sample(), AgentKind::Codex, &debian), None);
+    }
+
+    #[test]
+    fn fr_agent_009_not_installed_entry_has_no_path() {
+        assert_eq!(
+            installed_path(&sample(), AgentKind::Claude, &Environment::Macos),
+            None
+        );
+    }
+
+    #[test]
+    fn fr_agent_009_failed_and_stopped_entries_have_no_path() {
+        let detection = Detection {
+            entries: vec![
+                entry(
+                    AgentKind::Claude,
+                    ubuntu(),
+                    AgentStatus::Failed {
+                        reason: FailureReason::Timeout,
+                    },
+                ),
+                entry(AgentKind::Codex, ubuntu(), AgentStatus::Stopped),
+            ],
+        };
+        assert_eq!(
+            installed_path(&detection, AgentKind::Claude, &ubuntu()),
+            None
+        );
+        assert_eq!(
+            installed_path(&detection, AgentKind::Codex, &ubuntu()),
+            None
+        );
+    }
+
+    #[test]
+    fn fr_agent_009_missing_entry_has_no_path() {
+        let empty = Detection { entries: vec![] };
+        assert_eq!(
+            installed_path(&empty, AgentKind::Codex, &Environment::Macos),
+            None
+        );
+        assert_eq!(
+            installed_path(&sample(), AgentKind::Claude, &Environment::Windows),
+            None
+        );
+    }
+
+    fn environment_strategy() -> impl Strategy<Value = Environment> {
+        prop_oneof![
+            Just(Environment::Macos),
+            Just(Environment::Windows),
+            Just(ubuntu()),
+            Just(Environment::Wsl {
+                distro: "Debian".to_string()
+            }),
+        ]
+    }
+
+    fn agent_strategy() -> impl Strategy<Value = AgentKind> {
+        prop_oneof![Just(AgentKind::Claude), Just(AgentKind::Codex)]
+    }
+
+    fn status_strategy() -> impl Strategy<Value = AgentStatus> {
+        prop_oneof![
+            "[a-z/]{1,12}".prop_map(|path| installed(&path)),
+            Just(AgentStatus::NotInstalled),
+            Just(AgentStatus::Failed {
+                reason: FailureReason::VersionUnreadable
+            }),
+            Just(AgentStatus::Stopped),
+        ]
+    }
+
+    proptest! {
+        // 속성: 경로가 나오는 것은 요청한 에이전트와 환경이 같은 설치됨 항목이 있을 때뿐이고, 그 경로는 그 항목의 경로다
+        #[test]
+        fn fr_agent_009_path_comes_only_from_matching_installed_entry(
+            entries in prop::collection::vec(
+                (agent_strategy(), environment_strategy(), status_strategy()),
+                0..8,
+            ),
+            agent in agent_strategy(),
+            environment in environment_strategy(),
+        ) {
+            // 에이전트와 환경 조합마다 한 줄이라는 감지 결과의 모양을 지킨다
+            let mut seen: Vec<(AgentKind, Environment)> = Vec::new();
+            let entries: Vec<AgentEntry> = entries
+                .into_iter()
+                .filter(|(a, e, _)| {
+                    if seen.contains(&(*a, e.clone())) {
+                        false
+                    } else {
+                        seen.push((*a, e.clone()));
+                        true
+                    }
+                })
+                .map(|(a, e, s)| entry(a, e, s))
+                .collect();
+            let expected = entries.iter().find_map(|candidate| match &candidate.status {
+                AgentStatus::Installed { path, .. }
+                    if candidate.agent == agent && candidate.environment == environment =>
+                {
+                    Some(path.clone())
+                }
+                _ => None,
+            });
+            let detection = Detection { entries };
+            prop_assert_eq!(installed_path(&detection, agent, &environment), expected);
         }
     }
 }

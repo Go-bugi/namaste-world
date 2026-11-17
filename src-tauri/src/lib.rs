@@ -4,6 +4,7 @@ mod commands;
 mod error;
 mod events;
 pub mod hook;
+pub mod login;
 pub mod model;
 pub mod placement;
 mod platform;
@@ -35,6 +36,8 @@ pub fn run() {
             commands::agent::agent_detection,
             commands::agent::redetect_agents,
             commands::hook::hook_installation,
+            commands::hook::reinstall_hooks,
+            commands::login::agent_login_status,
             commands::model::agent_models,
             commands::onboarding::saved_selection,
             commands::onboarding::finish_onboarding
