@@ -1,10 +1,8 @@
 import type { Detection } from '@renderer/types/bindings/Detection';
 import StepSection from './StepSection';
 import { toRows } from './domain/detectionView';
-import type { StepStatus } from './domain/steps';
 
 type Props = {
-  readonly status: StepStatus;
   readonly result?: Detection;
   readonly detecting: boolean;
   readonly canRedetect: boolean;
@@ -12,17 +10,10 @@ type Props = {
 };
 
 /** 감지 단계. 감지 결과를 에이전트와 실행 환경마다 한 줄씩 보여 주고 다시 감지 버튼을 둔다. */
-function DetectionStep({
-  status,
-  result,
-  detecting,
-  canRedetect,
-  onRedetect,
-}: Props): React.JSX.Element {
+function DetectionStep({ result, detecting, canRedetect, onRedetect }: Props): React.JSX.Element {
   return (
     <StepSection
-      title="1. 설치된 에이전트 감지"
-      status={status}
+      title="설치된 에이전트 감지"
       action={
         <button type="button" disabled={!canRedetect} onClick={onRedetect}>
           다시 감지

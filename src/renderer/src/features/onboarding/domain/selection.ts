@@ -160,9 +160,10 @@ function omit(state: SelectionState, key: 'saved' | 'selectedKey' | 'model'): Se
   };
 }
 
-/** 다음 버튼을 누를 수 있는가. 감지 중이 아니고 에이전트와 모델이 모두 골라졌을 때만 true. */
-export function canProceed(state: SelectionState, detecting: boolean): boolean {
-  return !detecting && toSelection(state) !== undefined;
+/** 모델 목록 다시 불러오기 버튼을 누를 수 있는가. 에이전트를 골랐고 그 목록을 불러오는 중이 아닐 때만 true. FR-START-010 */
+export function canReloadModels(state: SelectionState): boolean {
+  const key = state.selectedKey;
+  return key !== undefined && state.models[key]?.status !== 'loading';
 }
 
 /** 다음을 누를 때 넘길 값. 고르지 않았으면 undefined. */

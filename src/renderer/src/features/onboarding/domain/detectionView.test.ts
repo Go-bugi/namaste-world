@@ -228,7 +228,7 @@ describe('panelReducer, canRedetect', () => {
   it('FR-AGENT-008 시나리오 2: 처음 상태는 결과 없이 확인 중이고 다시 감지 버튼이 비활성화된다', () => {
     expect(initialPanelState.result).toBeUndefined();
     expect(initialPanelState.detecting).toBe(true);
-    expect(canRedetect(initialPanelState)).toBe(false);
+    expect(canRedetect(initialPanelState, false)).toBe(false);
   });
 
   it('FR-AGENT-008 시나리오 2: 처음 감지가 끝나면 결과로 바뀌고 버튼이 활성화된다', () => {
@@ -236,7 +236,7 @@ describe('panelReducer, canRedetect', () => {
     const next = panelReducer(initialPanelState, { type: 'detected', result });
 
     expect(next).toEqual({ result, detecting: false });
-    expect(canRedetect(next)).toBe(true);
+    expect(canRedetect(next, false)).toBe(true);
   });
 
   it('FR-AGENT-008 시나리오 3: 다시 감지 중에는 이전 결과를 그대로 두고 확인 중이며 버튼이 비활성화된다', () => {
@@ -245,7 +245,7 @@ describe('panelReducer, canRedetect', () => {
 
     expect(next.result).toBe(previous);
     expect(next.detecting).toBe(true);
-    expect(canRedetect(next)).toBe(false);
+    expect(canRedetect(next, false)).toBe(false);
   });
 
   it('FR-AGENT-008 시나리오 4: 다시 감지가 끝나면 새 결과로 바뀌고 버튼이 다시 활성화된다', () => {
@@ -264,7 +264,7 @@ describe('panelReducer, canRedetect', () => {
     const done = panelReducer(detecting, { type: 'detected', result: fresh });
 
     expect(done).toEqual({ result: fresh, detecting: false });
-    expect(canRedetect(done)).toBe(true);
+    expect(canRedetect(done, false)).toBe(true);
   });
 
   it('FR-AGENT-008: 감지 요청이 실패하면 이전 결과를 두고 버튼이 다시 활성화된다', () => {
@@ -273,7 +273,7 @@ describe('panelReducer, canRedetect', () => {
 
     expect(next.result).toBe(previous);
     expect(next.detecting).toBe(false);
-    expect(canRedetect(next)).toBe(true);
+    expect(canRedetect(next, false)).toBe(true);
   });
 
   test.prop([panelStateArb, detectionArb])(
@@ -297,9 +297,27 @@ describe('panelReducer, canRedetect', () => {
   );
 
   test.prop([panelStateArb])(
-    'FR-AGENT-008: 감지 중일 때만 다시 감지 버튼이 비활성화된다',
+    'FR-AGENT-008: 훅 설치 중이 아니면 감지 중일 때만 다시 감지 버튼이 비활성화된다',
     (state) => {
-      expect(canRedetect(state)).toBe(!state.detecting);
+      expect(canRedetect(state, false)).toBe(!state.detecting);
+    },
+  );
+
+  it('FR-AGENT-008 시나리오 5: 다시 감지가 끝나고 훅 설치가 진행 중이면 다시 감지 버튼은 비활성화되고, 설치가 끝나면 활성화된다', () => {
+    const fresh = detection(entry('codex', windows, { status: 'notInstalled' }));
+    const done = panelReducer(
+      { result: fresh, detecting: true },
+      { type: 'detected', result: fresh },
+    );
+
+    expect(canRedetect(done, true)).toBe(false);
+    expect(canRedetect(done, false)).toBe(true);
+  });
+
+  test.prop([panelStateArb, fc.boolean()])(
+    'FR-AGENT-008: 감지 중이거나 훅 설치 중이면 다시 감지 버튼은 비활성화된다',
+    (state, installing) => {
+      expect(canRedetect(state, installing)).toBe(!state.detecting && !installing);
     },
   );
 });

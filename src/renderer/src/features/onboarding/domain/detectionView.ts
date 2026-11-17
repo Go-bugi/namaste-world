@@ -105,7 +105,7 @@ export function panelReducer(state: PanelState, event: PanelEvent): PanelState {
   }
 }
 
-/** 다시 감지 버튼을 누를 수 있는가. 감지 중이면 false다. */
-export function canRedetect(state: PanelState): boolean {
-  return !state.detecting;
+/** 다시 감지 버튼을 누를 수 있는가. 감지 중이거나 훅 설치 중이면 false다. FR-AGENT-008 */
+export function canRedetect(state: PanelState, installing: boolean): boolean {
+  return !state.detecting && !installing;
 }
