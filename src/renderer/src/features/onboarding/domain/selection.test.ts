@@ -10,7 +10,7 @@ import type { Selection } from '@renderer/types/bindings/Selection';
 import { describe, expect, it } from 'vitest';
 import {
   agentChoices,
-  canProceed,
+  canReloadModels,
   choicesToQuery,
   initialSelectionState,
   selectionReducer,
@@ -180,7 +180,7 @@ describe('selectionReducer', () => {
 
     expect(state.choices).toEqual([]);
     expect(state.selectedKey).toBeUndefined();
-    expect(canProceed(state, false)).toBe(false);
+    expect(toSelection(state)).toBeUndefined();
   });
 
   it('FR-START-007: modelsLoading이면 그 항목의 목록이 불러오는 중이 된다', () => {
@@ -256,7 +256,7 @@ describe('selectionReducer', () => {
 
     expect(state.selectedKey).toBe(codexMac);
     expect(state.model).toBeUndefined();
-    expect(canProceed(state, false)).toBe(false);
+    expect(toSelection(state)).toBeUndefined();
   });
 
   it('FR-START-004: 같은 에이전트를 다시 고르면 고른 모델이 그대로다', () => {
@@ -367,7 +367,7 @@ describe('selectionReducer', () => {
 
     expect(state.selectedKey).toBeUndefined();
     expect(toSelection(state)).toBeUndefined();
-    expect(canProceed(state, false)).toBe(false);
+    expect(toSelection(state)).toBeUndefined();
   });
 
   const savedCodex: Selection = { agent: 'codex', environment: macos, model: 'gpt-5.6-sol' };
@@ -448,38 +448,63 @@ describe('selectionReducer', () => {
   });
 });
 
-describe('canProceed', () => {
-  const ready = (): SelectionState =>
-    run(
+describe('canReloadModels', () => {
+  it('FR-START-010 시나리오 3: 에이전트를 고르지 않았으면 다시 불러오기 버튼은 비활성화된다', () => {
+    const state = run(initialSelectionState, { type: 'detected', detection: macBoth });
+
+    expect(state.selectedKey).toBeUndefined();
+    expect(canReloadModels(state)).toBe(false);
+  });
+
+  it('FR-START-010 시나리오 2: 고른 에이전트의 모델 목록을 불러오는 중이면 버튼은 비활성화된다', () => {
+    const state = run(
+      initialSelectionState,
+      { type: 'detected', detection: macBoth },
+      { type: 'agentPicked', key: claudeMac },
+      { type: 'modelsLoading', key: claudeMac },
+    );
+
+    expect(canReloadModels(state)).toBe(false);
+  });
+
+  it('FR-START-010 시나리오 1: 고른 에이전트의 목록이 준비되어 있으면 버튼이 활성화된다', () => {
+    const state = run(
       initialSelectionState,
       { type: 'detected', detection: macBoth },
       { type: 'modelsLoaded', key: claudeMac, list: claudeList },
       { type: 'agentPicked', key: claudeMac },
+      { type: 'modelPicked', value: 'sonnet' },
     );
 
-  it('FR-START-005 시나리오 1: 에이전트와 모델이 모두 골라졌고 감지 중이 아니면 다음 버튼이 활성화된다', () => {
-    expect(canProceed(ready(), false)).toBe(true);
+    expect(canReloadModels(state)).toBe(true);
   });
 
-  it('FR-START-005: 감지나 다시 감지가 진행 중이면 다음 버튼은 비활성화된다', () => {
-    expect(canProceed(ready(), true)).toBe(false);
-  });
-
-  it('FR-START-005 시나리오 2: 에이전트는 골랐지만 모델이 골라지지 않으면 다음 버튼은 비활성화된다', () => {
-    const noModel = run(
+  it('FR-START-010: 다른 에이전트의 목록을 불러오는 중이어도 고른 에이전트의 목록이 준비되었으면 활성화된다', () => {
+    const state = run(
       initialSelectionState,
       { type: 'detected', detection: macBoth },
-      { type: 'agentPicked', key: codexMac },
+      { type: 'modelsLoaded', key: claudeMac, list: claudeList },
+      { type: 'agentPicked', key: claudeMac },
+      { type: 'modelsLoading', key: codexMac },
     );
 
-    expect(noModel.selectedKey).toBe(codexMac);
-    expect(canProceed(noModel, false)).toBe(false);
+    expect(canReloadModels(state)).toBe(true);
   });
 
-  it('FR-START-005: 에이전트를 고르지 않았으면 다음 버튼은 비활성화된다', () => {
-    const state = run(initialSelectionState, { type: 'detected', detection: macBoth });
+  it('FR-START-010 시나리오 1: 다시 불러오는 동안 비활성화되고, 새 목록에 고른 모델이 있으면 그대로 골라져 있다', () => {
+    const picked = run(
+      initialSelectionState,
+      { type: 'detected', detection: macBoth },
+      { type: 'modelsLoaded', key: claudeMac, list: claudeList },
+      { type: 'agentPicked', key: claudeMac },
+      { type: 'modelPicked', value: 'sonnet' },
+    );
+    const reloading = run(picked, { type: 'modelsLoading', key: claudeMac });
+    const reloaded = run(reloading, { type: 'modelsLoaded', key: claudeMac, list: claudeList });
 
-    expect(canProceed(state, false)).toBe(false);
+    expect(canReloadModels(reloading)).toBe(false);
+    expect(reloaded.model).toBe('sonnet');
+    expect(canReloadModels(reloaded)).toBe(true);
   });
 
   const eventArb: fc.Arbitrary<SelectionEvent> = fc.oneof(
@@ -499,18 +524,14 @@ describe('canProceed', () => {
   );
 
   test.prop([fc.array(eventArb, { maxLength: 12 })])(
-    'FR-START-005: 감지 중이면 어떤 상태에서도 다음 버튼은 비활성화된다',
-    (events) => {
-      expect(canProceed(run(initialSelectionState, ...events), true)).toBe(false);
-    },
-  );
-
-  test.prop([fc.array(eventArb, { maxLength: 12 })])(
-    'FR-START-005: 다음 버튼이 활성화되면 넘길 선택 값이 있다',
+    'FR-START-010: 에이전트를 골랐고 그 목록을 불러오는 중이 아닐 때만 다시 불러오기 버튼이 활성화된다',
     (events) => {
       const state = run(initialSelectionState, ...events);
+      const key = state.selectedKey;
 
-      expect(canProceed(state, false)).toBe(toSelection(state) !== undefined);
+      expect(canReloadModels(state)).toBe(
+        key !== undefined && state.models[key]?.status !== 'loading',
+      );
     },
   );
 });

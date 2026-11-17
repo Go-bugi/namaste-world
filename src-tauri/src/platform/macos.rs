@@ -147,12 +147,12 @@ pub async fn hook_target(
 use crate::model::host::{ModelHost, CLAUDE_INIT_ARGS, CLAUDE_INIT_SETTINGS, CODEX_MODELS_ARGS};
 
 /// macOS의 모델 목록 조회. 감지와 같은 로그인 셸 `PATH`로 실행해 npm으로 설치한 CLI가 `node`를 찾게 한다.
-pub struct ModelCli {
+pub struct AgentCli {
     path_env: String,
     home: PathBuf,
 }
 
-impl ModelCli {
+impl AgentCli {
     /// 감지 때 읽어 둔 로그인 셸 `PATH`를 쓴다. 아직 없으면 셸을 다시 띄우지 않고 앱의 `PATH`만 쓴다.
     /// 셸을 띄우면 조회 시간 상한(SC-START-001) 밖에서 몇 초가 더 걸릴 수 있기 때문이다.
     pub async fn new() -> Self {
@@ -173,7 +173,7 @@ impl ModelCli {
     }
 }
 
-impl ModelHost for ModelCli {
+impl ModelHost for AgentCli {
     async fn claude_init<T: Send>(
         &self,
         _environment: &Environment,
@@ -197,5 +197,24 @@ impl ModelHost for ModelCli {
         tokio::fs::read_to_string(self.home.join(".codex").join("config.toml"))
             .await
             .ok()
+    }
+}
+
+// ---------------------------------------------------------------- 로그인 상태 확인
+
+use crate::login::check::LOGIN_CHECK_LIMIT;
+use crate::login::host::{CliOutput, LoginHost};
+
+impl LoginHost for AgentCli {
+    async fn run(
+        &self,
+        _environment: &Environment,
+        path: &str,
+        args: &[&str],
+    ) -> Option<CliOutput> {
+        let mut command = self.command(path);
+        command.args(args);
+        let output = process::run_tree_capture(command, LOGIN_CHECK_LIMIT).await?;
+        Some(process::cli_output(&output))
     }
 }

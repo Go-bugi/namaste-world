@@ -4,26 +4,42 @@ import type { Detection } from '@renderer/types/bindings/Detection';
 import type { HookInstallation } from '@renderer/types/bindings/HookInstallation';
 import DetectionStep from './DetectionStep';
 import InstallStep from './InstallStep';
+import LoginStep from './LoginStep';
 import SelectStep from './SelectStep';
+import StepIndicator from './StepIndicator';
+import StepNav from './StepNav';
 import { canRedetect, initialPanelState, panelReducer } from './domain/detectionView';
 import { toInstallRows } from './domain/installView';
+import { initialLoginState, isLoggedIn, loginReducer } from './domain/login';
 import {
-  canProceed,
+  canReloadModels,
   choicesToQuery,
   initialSelectionState,
   selectionReducer,
   toSelection,
   type AgentChoice,
 } from './domain/selection';
-import { stepStatuses } from './domain/steps';
+import {
+  indicators,
+  navigation,
+  nextStep,
+  prevStep,
+  type StepId,
+  type StepperInput,
+} from './domain/stepper';
 
 /** IPC가 실패했을 때 모델 목록 조회를 다시 해 보는 횟수. Rust 명령 자체는 실패하지 않고 고정 목록을 준다. */
 const MODEL_QUERY_RETRIES = 1;
 
-/** 시작 설정 창. 감지, 훅 설치, 에이전트와 모델 선택을 차례로 보여 주고 다음 버튼으로 작은 창으로 넘어간다. */
+/**
+ * 시작 설정 창. 감지, 훅 설치, 에이전트와 모델 선택, 로그인 확인을 한 단계씩 보여 주고
+ * 이전과 다음 버튼으로 오간다. 마지막 단계의 다음 버튼으로 작은 창으로 넘어간다.
+ */
 function Onboarding(): React.JSX.Element {
+  const [current, setCurrent] = useState<StepId>('detect');
   const [panel, dispatchPanel] = useReducer(panelReducer, initialPanelState);
   const [selection, dispatchSelection] = useReducer(selectionReducer, initialSelectionState);
+  const [login, dispatchLogin] = useReducer(loginReducer, initialLoginState);
   const [installation, setInstallation] = useState<HookInstallation>();
   // 끝나기를 기다리는 훅 설치 수. 앱 시작 설치 하나에서 시작해 다시 감지할 때마다 하나씩 는다
   const [pendingInstalls, setPendingInstalls] = useState(1);
@@ -41,6 +57,8 @@ function Onboarding(): React.JSX.Element {
   const requestIds = useRef<Record<string, number>>({});
   // 앱 시작 설치의 끝을 무엇으로 셌는지. 같은 설치를 이벤트와 응답으로 두 번 세지 않는다
   const startupInstall = useRef<'pending' | 'byResponse' | 'done'>('pending');
+  // 마지막으로 보낸 로그인 확인 번호. 늦게 온 이전 확인 결과를 버린다
+  const loginRequest = useRef(0);
 
   const queryModels = useCallback((choice: AgentChoice): void => {
     const id = (requestIds.current[choice.key] ?? 0) + 1;
@@ -157,7 +175,39 @@ function Onboarding(): React.JSX.Element {
     if (selection.models[key] === undefined || stale) queryModels(choice);
   };
 
-  const next = (): void => {
+  const reinstall = (): void => {
+    // 끝나면 설치 결과 이벤트가 와서 센 수를 줄인다. 호출이 실패하면 이벤트가 오지 않으므로 바로 줄인다
+    setPendingInstalls((count) => count + 1);
+    void api.reinstallHooks().mapErr((e) => {
+      console.error('훅 다시 설치 실패', e);
+      setPendingInstalls((count) => Math.max(0, count - 1));
+    });
+  };
+
+  const selectedChoice = selection.choices.find((choice) => choice.key === selection.selectedKey);
+
+  const reloadModels = (): void => {
+    if (selectedChoice !== undefined) queryModels(selectedChoice);
+  };
+
+  const checkLogin = (choice: AgentChoice): void => {
+    loginRequest.current += 1;
+    const requestId = loginRequest.current;
+    dispatchLogin({ type: 'checkStarted', key: choice.key, requestId });
+    void api.getAgentLoginStatus(choice.agent, choice.environment).match(
+      (status) => dispatchLogin({ type: 'checked', requestId, status }),
+      (e) => {
+        console.error('로그인 상태 확인 실패', e);
+        dispatchLogin({
+          type: 'checked',
+          requestId,
+          status: { kind: 'failed', reason: { kind: 'launchFailed' } },
+        });
+      },
+    );
+  };
+
+  const finish = (): void => {
     const picked = toSelection(selection);
     if (picked === undefined) return;
     setSubmitting(true);
@@ -169,13 +219,34 @@ function Onboarding(): React.JSX.Element {
     });
   };
 
+  const goNext = (): void => {
+    const target = nextStep(current);
+    if (target === undefined) {
+      finish();
+      return;
+    }
+    // 로그인 확인 단계에 들어올 때마다 고른 항목을 새로 확인한다
+    if (target === 'login' && selectedChoice !== undefined) checkLogin(selectedChoice);
+    setCurrent(target);
+  };
+
+  const goPrev = (): void => {
+    const target = prevStep(current);
+    if (target !== undefined) setCurrent(target);
+  };
+
   const installing = pendingInstalls > 0;
-  const steps = stepStatuses({
+  const stepper: StepperInput = {
+    current,
     detecting: panel.detecting,
-    hasDetection: panel.result !== undefined,
+    hasInstalled: selection.choices.length > 0,
     installing,
     hasInstallation: installation !== undefined,
-  });
+    selectionReady: toSelection(selection) !== undefined,
+    loggedIn: isLoggedIn(login, selection.selectedKey),
+    submitting,
+  };
+  const { canPrev, canNext } = navigation(stepper);
   const installFailure =
     installation === undefined
       ? undefined
@@ -186,27 +257,44 @@ function Onboarding(): React.JSX.Element {
   return (
     <main className="onboarding">
       <h1>시작 설정</h1>
-      <DetectionStep
-        status={steps.detect}
-        detecting={panel.detecting}
-        canRedetect={canRedetect(panel)}
-        onRedetect={redetect}
-        {...(panel.result === undefined ? {} : { result: panel.result })}
-      />
-      <InstallStep
-        status={steps.install}
-        installing={installing}
-        {...(installation === undefined ? {} : { installation })}
-      />
-      <SelectStep
-        status={steps.select}
-        state={selection}
-        canProceed={canProceed(selection, panel.detecting)}
-        submitting={submitting}
-        onPickAgent={pickAgent}
-        onPickModel={(value) => dispatchSelection({ type: 'modelPicked', value })}
-        onNext={next}
-        {...(installFailure === undefined ? {} : { installFailure })}
+      <StepIndicator items={indicators(stepper)} />
+      {current === 'detect' && (
+        <DetectionStep
+          detecting={panel.detecting}
+          canRedetect={canRedetect(panel, installing)}
+          onRedetect={redetect}
+          {...(panel.result === undefined ? {} : { result: panel.result })}
+        />
+      )}
+      {current === 'install' && (
+        <InstallStep
+          installing={installing}
+          onReinstall={reinstall}
+          {...(installation === undefined ? {} : { installation })}
+        />
+      )}
+      {current === 'select' && (
+        <SelectStep
+          state={selection}
+          canReload={canReloadModels(selection)}
+          onPickAgent={pickAgent}
+          onPickModel={(value) => dispatchSelection({ type: 'modelPicked', value })}
+          onReload={reloadModels}
+          {...(installFailure === undefined ? {} : { installFailure })}
+        />
+      )}
+      {current === 'login' && selectedChoice !== undefined && (
+        <LoginStep
+          choice={selectedChoice}
+          state={login}
+          onRecheck={() => checkLogin(selectedChoice)}
+        />
+      )}
+      <StepNav
+        canPrev={canPrev}
+        canNext={canNext}
+        onPrev={goPrev}
+        onNext={goNext}
         {...(error === undefined ? {} : { error })}
       />
     </main>
