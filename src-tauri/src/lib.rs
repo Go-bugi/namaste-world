@@ -8,6 +8,7 @@ pub mod login;
 pub mod model;
 pub mod placement;
 mod platform;
+pub mod shell;
 mod state;
 mod tasks;
 mod window;
@@ -25,6 +26,7 @@ pub fn run() {
         .manage(state::AgentDetection::new())
         .manage(state::HookInstallState::new())
         .manage(state::SelectionState::new())
+        .manage(state::ShellEnvState::new())
         .manage(state::WindowSwitch::new())
         .setup(|app| {
             tasks::agent_detection::spawn_startup_detection(app.handle().clone());
@@ -40,7 +42,10 @@ pub fn run() {
             commands::login::agent_login_status,
             commands::model::agent_models,
             commands::onboarding::saved_selection,
-            commands::onboarding::finish_onboarding
+            commands::onboarding::finish_onboarding,
+            commands::shell::shell_setup,
+            commands::shell::set_shell,
+            commands::shell::detect_with_shell
         ])
         .on_window_event(platform::on_window_event)
         .build(tauri::generate_context!())

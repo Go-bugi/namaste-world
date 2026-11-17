@@ -579,6 +579,7 @@ mod installed_path_tests {
                 ),
                 entry(AgentKind::Codex, ubuntu(), installed("/usr/bin/codex")),
             ],
+            shell_env_failure: None,
         }
     }
 
@@ -628,6 +629,7 @@ mod installed_path_tests {
                 ),
                 entry(AgentKind::Codex, ubuntu(), AgentStatus::Stopped),
             ],
+            shell_env_failure: None,
         };
         assert_eq!(
             installed_path(&detection, AgentKind::Claude, &ubuntu()),
@@ -641,7 +643,10 @@ mod installed_path_tests {
 
     #[test]
     fn fr_agent_009_missing_entry_has_no_path() {
-        let empty = Detection { entries: vec![] };
+        let empty = Detection {
+            entries: vec![],
+            shell_env_failure: None,
+        };
         assert_eq!(
             installed_path(&empty, AgentKind::Codex, &Environment::Macos),
             None
@@ -711,7 +716,10 @@ mod installed_path_tests {
                 }
                 _ => None,
             });
-            let detection = Detection { entries };
+            let detection = Detection {
+                entries,
+                shell_env_failure: None,
+            };
             prop_assert_eq!(installed_path(&detection, agent, &environment), expected);
         }
     }

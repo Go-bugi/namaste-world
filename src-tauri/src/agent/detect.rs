@@ -25,6 +25,7 @@ pub async fn detect<H: Host>(host: &H, trigger: Trigger, limit: Duration) -> Det
         .collect();
     Detection {
         entries: join_all(checks).await.into_iter().flatten().collect(),
+        shell_env_failure: None,
     }
 }
 

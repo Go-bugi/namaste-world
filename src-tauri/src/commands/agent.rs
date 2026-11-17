@@ -1,5 +1,7 @@
 use crate::agent::domain::model::{Detection, Trigger};
-use crate::state::AgentDetection;
+use crate::platform;
+use crate::shell::choice::effective_shell;
+use crate::state::{AgentDetection, ShellEnvState};
 use crate::tasks::{agent_detection, hook_install};
 
 /// 보관한 감지 결과를 준다. 앱 시작 감지가 아직이면 끝날 때까지 기다린다.
@@ -9,15 +11,21 @@ pub async fn agent_detection(state: tauri::State<'_, AgentDetection>) -> Result<
     state.latest().await.ok_or(())
 }
 
-/// 새로 감지해 보관한 결과를 바꾸고 그 결과를 준다. 사용자 요청이므로 멈춘 WSL 배포판도 켜서 확인한다.
-/// 새로 설치됨이 된 항목에도 훅을 설치하도록 설치를 백그라운드에서 다시 돌린다.
+/// 셸 환경을 다시 읽고 새로 감지해 보관한 결과를 바꾸고 그 결과를 준다. 사용자 요청이므로 멈춘 WSL 배포판도 켜서 확인한다.
+/// Windows는 마지막 감지에 쓴 셸로 읽는다(FR-AGENT-014). 새로 설치됨이 된 항목에도 훅을 설치하도록 설치를 백그라운드에서 다시 돌린다.
 #[tauri::command]
 pub async fn redetect_agents(
     app: tauri::AppHandle,
-    state: tauri::State<'_, AgentDetection>,
+    shell_env: tauri::State<'_, ShellEnvState>,
 ) -> Result<Detection, ()> {
-    let detection = agent_detection::run(Trigger::UserRequested).await;
-    state.publish(detection.clone());
+    let shell = match shell_env.shell() {
+        Some(shell) => shell,
+        None => effective_shell(
+            super::shell::saved_shell(&app).await,
+            platform::git_bash_available(),
+        ),
+    };
+    let detection = agent_detection::run_and_store(&app, Trigger::UserRequested, shell).await;
     let installed = detection.clone();
     tauri::async_runtime::spawn(async move { hook_install::run(&app, &installed).await });
     Ok(detection)

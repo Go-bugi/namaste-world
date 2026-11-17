@@ -4,6 +4,7 @@ import type { AgentStatus } from '@renderer/types/bindings/AgentStatus';
 import type { Detection } from '@renderer/types/bindings/Detection';
 import type { Environment } from '@renderer/types/bindings/Environment';
 import type { FailureReason } from '@renderer/types/bindings/FailureReason';
+import type { ShellEnvFailure } from '@renderer/types/bindings/ShellEnvFailure';
 import { describe, expect, it } from 'vitest';
 import {
   STOPPED_DETAIL,
@@ -11,6 +12,7 @@ import {
   failureLabel,
   initialPanelState,
   panelReducer,
+  shellEnvNotice,
   toRows,
   type PanelState,
 } from './detectionView';
@@ -318,6 +320,62 @@ describe('panelReducer, canRedetect', () => {
     'FR-AGENT-008: 감지 중이거나 훅 설치 중이면 다시 감지 버튼은 비활성화된다',
     (state, installing) => {
       expect(canRedetect(state, installing)).toBe(!state.detecting && !installing);
+    },
+  );
+});
+
+describe('shellEnvNotice', () => {
+  const failureArb = fc.constantFrom<ShellEnvFailure>(
+    'timeout',
+    'launchFailed',
+    'exitedWithError',
+    'unreadableOutput',
+  );
+
+  it('FR-AGENT-018 시나리오 1: 셸 설정이 시간 안에 끝나지 않으면 이유 시간 초과가 담긴 안내를 낸다', () => {
+    const notice = shellEnvNotice({
+      entries: [entry('claude', macos, { status: 'notInstalled' })],
+      shellEnvFailure: 'timeout',
+    });
+
+    expect(notice).toBe('터미널 설정을 읽지 못해 터미널과 결과가 다를 수 있습니다 (시간 초과)');
+  });
+
+  it('FR-AGENT-018: 이유마다 셸 실행 실패, 셸 오류 종료, 알아볼 수 없는 출력을 안내에 담는다', () => {
+    expect(shellEnvNotice({ entries: [], shellEnvFailure: 'launchFailed' })).toBe(
+      '터미널 설정을 읽지 못해 터미널과 결과가 다를 수 있습니다 (셸을 열지 못함)',
+    );
+    expect(shellEnvNotice({ entries: [], shellEnvFailure: 'exitedWithError' })).toBe(
+      '터미널 설정을 읽지 못해 터미널과 결과가 다를 수 있습니다 (셸 설정 오류)',
+    );
+    expect(shellEnvNotice({ entries: [], shellEnvFailure: 'unreadableOutput' })).toBe(
+      '터미널 설정을 읽지 못해 터미널과 결과가 다를 수 있습니다 (결과를 읽지 못함)',
+    );
+  });
+
+  it('FR-AGENT-018 시나리오 2, 3: 셸 환경을 읽었거나 명령 프롬프트를 골라 실패가 없으면 안내가 없다', () => {
+    expect(
+      shellEnvNotice(detection(entry('codex', windows, { status: 'notInstalled' }))),
+    ).toBeUndefined();
+    expect(shellEnvNotice(detection())).toBeUndefined();
+  });
+
+  it('FR-AGENT-018: 이유가 다르면 안내도 다르다', () => {
+    const notices = (
+      ['timeout', 'launchFailed', 'exitedWithError', 'unreadableOutput'] as const
+    ).map((shellEnvFailure) => shellEnvNotice({ entries: [], shellEnvFailure }));
+
+    expect(new Set(notices).size).toBe(4);
+  });
+
+  test.prop([failureArb, detectionArb])(
+    'FR-AGENT-018, FR-AGENT-017: 안내는 실패 이유로만 정해지고 감지 항목의 값은 담지 않는다',
+    (shellEnvFailure, d) => {
+      const notice = shellEnvNotice({ ...d, shellEnvFailure });
+
+      expect(notice).toBeDefined();
+      expect(notice?.trim()).not.toBe('');
+      expect(notice).toBe(shellEnvNotice({ entries: [], shellEnvFailure }));
     },
   );
 });

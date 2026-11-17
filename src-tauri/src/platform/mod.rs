@@ -9,9 +9,36 @@ mod process;
 mod windows;
 
 #[cfg(target_os = "macos")]
-pub use macos::{app_dir, hook_target, on_run_event, on_window_event, AgentCli, AgentHost};
+pub use macos::{
+    app_dir, git_bash_available, hook_target, on_run_event, on_window_event, read_shell_env,
+    AgentCli, AgentHost, DETECT_AT_STARTUP,
+};
 #[cfg(target_os = "windows")]
-pub use windows::{app_dir, hook_target, AgentCli, AgentHost};
+pub use windows::{
+    app_dir, git_bash_available, hook_target, read_shell_env, AgentCli, AgentHost,
+    DETECT_AT_STARTUP,
+};
+
+/// 셸 환경 읽기에 주는 시간(SC-AGENT-003). 셸 설정 파일이 느리면 이 시간 뒤에 앱 환경으로 진행한다.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+const SHELL_ENV_LIMIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// 앱이 받은 환경 변수. 셸 환경을 읽지 못하면 이 값으로 CLI를 실행한다.
+pub fn app_vars() -> std::collections::BTreeMap<String, String> {
+    std::env::vars_os()
+        .map(|(key, value)| {
+            (
+                key.to_string_lossy().into_owned(),
+                value.to_string_lossy().into_owned(),
+            )
+        })
+        .collect()
+}
+
+/// 앱이 받은 환경 그대로의 실행 환경. 아직 셸 환경을 읽지 않았을 때 쓴다.
+pub fn app_env() -> crate::shell::model::ShellEnv {
+    crate::shell::model::ShellEnv::new(app_vars())
+}
 
 /// 창 배치를 논리 좌표(포인트)로 계산하는가. macOS는 모니터 위치를 "논리 원점 × 그 모니터의 배율"로 주어
 /// 배율이 다른 모니터끼리 물리 좌표가 겹치므로 논리 좌표로 계산한다. Windows는 전역 물리 좌표가 하나라 그대로 쓴다.
@@ -30,15 +57,30 @@ pub fn on_run_event(_app: &tauri::AppHandle, _event: tauri::RunEvent) {}
 
 pub use fs::write_file;
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub use unsupported::{app_dir, hook_target, AgentCli, AgentHost};
+pub use unsupported::{
+    app_dir, git_bash_available, hook_target, read_shell_env, AgentCli, AgentHost,
+    DETECT_AT_STARTUP,
+};
 
 /// macOS와 Windows가 아닌 OS. 확인할 환경이 없어 감지 결과가 비어 있다.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod unsupported {
-    use crate::agent::domain::model::{EnvProbe, Environment, FailureReason, Target, Trigger};
+    use crate::agent::domain::model::{EnvProbe, Environment, FailureReason, Target};
     use crate::agent::host::Host;
+    use crate::shell::model::{ShellEnv, ShellEnvFailure, ShellKind};
 
     pub struct AgentHost;
+
+    pub const DETECT_AT_STARTUP: bool = true;
+
+    pub fn git_bash_available() -> bool {
+        false
+    }
+
+    /// 읽을 셸이 없어 앱 환경을 그대로 쓴다.
+    pub async fn read_shell_env(_shell: ShellKind) -> (ShellEnv, Option<ShellEnvFailure>) {
+        (super::app_env(), None)
+    }
 
     /// 설치 대상이 없으므로 쓰이지 않는다.
     pub type HookFs = super::fs::NativeFs;
@@ -53,6 +95,7 @@ mod unsupported {
         _entry: &crate::agent::domain::model::AgentEntry,
         _version: &str,
         _app_dir: &std::path::Path,
+        _env: &ShellEnv,
     ) -> Result<
         (crate::hook::domain::model::InstallTarget, HookFs),
         crate::hook::domain::model::InstallFailure,
@@ -63,7 +106,7 @@ mod unsupported {
     }
 
     impl AgentHost {
-        pub async fn new(_trigger: Trigger) -> Self {
+        pub fn new(_env: ShellEnv) -> Self {
             Self
         }
     }
@@ -72,7 +115,7 @@ mod unsupported {
     pub struct AgentCli;
 
     impl AgentCli {
-        pub async fn new() -> Self {
+        pub fn new(_env: ShellEnv) -> Self {
             Self
         }
     }

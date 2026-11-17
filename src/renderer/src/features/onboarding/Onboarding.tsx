@@ -2,13 +2,21 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { api } from '@renderer/api';
 import type { Detection } from '@renderer/types/bindings/Detection';
 import type { HookInstallation } from '@renderer/types/bindings/HookInstallation';
+import type { ShellKind } from '@renderer/types/bindings/ShellKind';
+import type { ShellSetup } from '@renderer/types/bindings/ShellSetup';
 import DetectionStep from './DetectionStep';
 import InstallStep from './InstallStep';
 import LoginStep from './LoginStep';
 import SelectStep from './SelectStep';
+import ShellStep from './ShellStep';
 import StepIndicator from './StepIndicator';
 import StepNav from './StepNav';
-import { canRedetect, initialPanelState, panelReducer } from './domain/detectionView';
+import {
+  canRedetect,
+  initialPanelState,
+  panelReducer,
+  shellEnvNotice,
+} from './domain/detectionView';
 import { toInstallRows } from './domain/installView';
 import { initialLoginState, isLoggedIn, loginReducer } from './domain/login';
 import {
@@ -19,11 +27,13 @@ import {
   toSelection,
   type AgentChoice,
 } from './domain/selection';
+import { shouldDetect } from './domain/shell';
 import {
   indicators,
   navigation,
   nextStep,
   prevStep,
+  stepsFor,
   type StepId,
   type StepperInput,
 } from './domain/stepper';
@@ -34,8 +44,14 @@ const MODEL_QUERY_RETRIES = 1;
 /**
  * 시작 설정 창. 감지, 훅 설치, 에이전트와 모델 선택, 로그인 확인을 한 단계씩 보여 주고
  * 이전과 다음 버튼으로 오간다. 마지막 단계의 다음 버튼으로 작은 창으로 넘어간다.
+ * Windows는 맨 앞에 셸 선택 단계가 있고, 그 단계에서 다음을 누를 때 고른 셸로 감지한다(FR-START-013).
  */
 function Onboarding(): React.JSX.Element {
+  // 셸 선택 단계가 있는지(Windows) 알기 전에는 undefined다
+  const [shellSetup, setShellSetup] = useState<ShellSetup | 'none'>();
+  const [selectedShell, setSelectedShell] = useState<ShellKind>();
+  // 마지막으로 감지에 쓴 셸. 셸 선택 단계에서 다음을 누르기 전에는 undefined다
+  const [detectedShell, setDetectedShell] = useState<ShellKind>();
   const [current, setCurrent] = useState<StepId>('detect');
   const [panel, dispatchPanel] = useReducer(panelReducer, initialPanelState);
   const [selection, dispatchSelection] = useReducer(selectionReducer, initialSelectionState);
@@ -122,27 +138,40 @@ function Onboarding(): React.JSX.Element {
       }
     });
 
+    // 셸 선택 단계가 있으면(Windows) 감지는 그 단계에서 다음을 누를 때 시작하므로 여기서 기다리지 않는다.
+    // 셸 설정을 읽지 못하면 셸 선택 단계 없이 진행한다
+    const setupLoaded = api.getShellSetup().match(
+      (setup) => setup,
+      () => undefined,
+    );
     // 저장한 선택을 먼저 넣어야 감지 결과가 왔을 때 미리 고를 수 있다
-    void api
-      .getSavedSelection()
-      .match(
-        (saved) => {
-          if (!cancelled) dispatchSelection({ type: 'savedLoaded', saved });
+    const savedLoaded = api.getSavedSelection().match(
+      (saved) => {
+        if (!cancelled) dispatchSelection({ type: 'savedLoaded', saved });
+      },
+      () => {
+        if (!cancelled) dispatchSelection({ type: 'savedLoaded', saved: undefined });
+      },
+    );
+    void setupLoaded.then(async (setup) => {
+      if (cancelled) return;
+      if (setup !== undefined) {
+        setShellSetup(setup);
+        setSelectedShell(setup.selected);
+        setCurrent('shell');
+        return;
+      }
+      setShellSetup('none');
+      await savedLoaded;
+      await api.getAgentDetection().match(
+        (result) => {
+          if (!cancelled) onDetected(result);
         },
         () => {
-          if (!cancelled) dispatchSelection({ type: 'savedLoaded', saved: undefined });
+          if (!cancelled) dispatchPanel({ type: 'failed' });
         },
-      )
-      .then(() =>
-        api.getAgentDetection().match(
-          (result) => {
-            if (!cancelled) onDetected(result);
-          },
-          () => {
-            if (!cancelled) dispatchPanel({ type: 'failed' });
-          },
-        ),
       );
+    });
 
     return () => {
       cancelled = true;
@@ -219,8 +248,33 @@ function Onboarding(): React.JSX.Element {
     });
   };
 
+  const hasShellStep = shellSetup !== undefined && shellSetup !== 'none';
+  const steps = stepsFor(hasShellStep);
+  // 셸 선택 단계가 있으면 셸을 확정해야 감지와 그 뒤 훅 설치가 시작된다
+  const shellConfirmed = detectedShell !== undefined;
+  const started = !hasShellStep || shellConfirmed;
+
+  const pickShell = (shell: ShellKind): void => {
+    setSelectedShell(shell);
+    void api.setShell(shell).mapErr((e) => console.error('셸 선택 저장 실패', e));
+  };
+
+  const confirmShell = (shell: ShellKind): void => {
+    if (!shouldDetect(detectedShell, shell)) return;
+    // 셸을 바꿔 다시 감지하면 Rust가 훅 설치를 한 번 더 돌린다. 처음 감지 뒤의 설치는 앱 시작 설치로 이미 세었다
+    if (detectedShell !== undefined) setPendingInstalls((count) => count + 1);
+    setDetectedShell(shell);
+    dispatchPanel({ type: 'redetectStarted' });
+    void api.detectWithShell(shell).match(onDetected, () => {
+      // 감지하지 못했으면 같은 셸로 다음을 눌러도 다시 감지하게 한다
+      setDetectedShell(undefined);
+      dispatchPanel({ type: 'failed' });
+    });
+  };
+
   const goNext = (): void => {
-    const target = nextStep(current);
+    if (current === 'shell' && selectedShell !== undefined) confirmShell(selectedShell);
+    const target = nextStep(steps, current);
     if (target === undefined) {
       finish();
       return;
@@ -231,14 +285,16 @@ function Onboarding(): React.JSX.Element {
   };
 
   const goPrev = (): void => {
-    const target = prevStep(current);
+    const target = prevStep(steps, current);
     if (target !== undefined) setCurrent(target);
   };
 
-  const installing = pendingInstalls > 0;
+  const installing = started && pendingInstalls > 0;
   const stepper: StepperInput = {
+    steps,
     current,
-    detecting: panel.detecting,
+    shellConfirmed,
+    detecting: started && panel.detecting,
     hasInstalled: selection.choices.length > 0,
     installing,
     hasInstallation: installation !== undefined,
@@ -257,13 +313,18 @@ function Onboarding(): React.JSX.Element {
   return (
     <main className="onboarding">
       <h1>시작 설정</h1>
-      <StepIndicator items={indicators(stepper)} />
-      {current === 'detect' && (
+      {shellSetup !== undefined && <StepIndicator items={indicators(stepper)} />}
+      {current === 'shell' && hasShellStep && selectedShell !== undefined && (
+        <ShellStep options={shellSetup.options} selected={selectedShell} onPick={pickShell} />
+      )}
+      {current === 'detect' && shellSetup !== undefined && (
         <DetectionStep
           detecting={panel.detecting}
           canRedetect={canRedetect(panel, installing)}
           onRedetect={redetect}
-          {...(panel.result === undefined ? {} : { result: panel.result })}
+          {...(panel.result === undefined
+            ? {}
+            : { result: panel.result, notice: shellEnvNotice(panel.result) })}
         />
       )}
       {current === 'install' && (

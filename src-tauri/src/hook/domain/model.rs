@@ -95,7 +95,12 @@ pub struct InstallTarget {
     pub environment: Environment,
     /// 감지 결과의 버전.
     pub version: String,
+    /// 훅 스크립트를 두는 `.namaste-world`의 상위 폴더.
     pub home: String,
+    /// Claude Code 사용자 전역 설정 폴더. `CLAUDE_CONFIG_DIR`, 없으면 홈의 `.claude`(FR-HOOK-002).
+    pub claude_dir: String,
+    /// Codex 사용자 전역 설정 폴더. `CODEX_HOME`, 없으면 홈의 `.codex`(FR-HOOK-002).
+    pub codex_dir: String,
     /// 그 환경에서 훅 스크립트가 읽을 엔드포인트 파일 경로.
     pub endpoint_path: String,
 }

@@ -2,14 +2,23 @@
 export type StepStatus = 'pending' | 'running' | 'done';
 
 /** 시작 설정의 단계. */
-export type StepId = 'detect' | 'install' | 'select' | 'login';
+export type StepId = 'shell' | 'detect' | 'install' | 'select' | 'login';
 
-/** 단계 순서. 감지, 훅 설치, 에이전트와 모델 선택, 로그인 확인. */
-export const STEPS: readonly StepId[] = ['detect', 'install', 'select', 'login'];
+/** 셸 단계가 있으면(Windows) 맨 앞에 'shell'을 둔다. 그 뒤는 감지, 훅 설치, 에이전트와 모델 선택, 로그인 확인. FR-START-002 */
+export function stepsFor(hasShellStep: boolean): readonly StepId[] {
+  return hasShellStep ? ['shell', ...BASE_STEPS] : BASE_STEPS;
+}
+
+/** 모든 OS에 있는 단계. */
+const BASE_STEPS: readonly StepId[] = ['detect', 'install', 'select', 'login'];
 
 /** 이전/다음 버튼과 단계 표시줄을 정하는 입력. */
 export type StepperInput = {
+  /** 이번 OS의 단계 목록(stepsFor) */
+  readonly steps: readonly StepId[];
   readonly current: StepId;
+  /** 셸 단계에서 다음을 눌러 셸을 확정함 */
+  readonly shellConfirmed: boolean;
   /** 앱 시작 감지나 다시 감지가 진행 중 */
   readonly detecting: boolean;
   /** 감지 결과에 설치됨 항목이 하나 이상 */
@@ -27,13 +36,22 @@ export type StepperInput = {
 };
 
 /**
- * 단계의 일이 끝났는가. 감지는 감지 중이 아님, 훅 설치는 설치 중이 아니고 결과가 있음,
- * 선택은 에이전트와 모델이 골라짐, 로그인 확인은 로그인됨이다.
+ * 감지가 시작됐는가. 셸 단계가 있는 OS(Windows)는 셸을 확정해야 감지가 시작된다. FR-START-013
+ */
+function detectionStarted(input: StepperInput): boolean {
+  return !input.steps.includes('shell') || input.shellConfirmed;
+}
+
+/**
+ * 단계의 일이 끝났는가. 셸 선택은 셸을 확정함, 감지는 시작됐고 감지 중이 아님,
+ * 훅 설치는 설치 중이 아니고 결과가 있음, 선택은 에이전트와 모델이 골라짐, 로그인 확인은 로그인됨이다.
  */
 function isDone(input: StepperInput, id: StepId): boolean {
   switch (id) {
+    case 'shell':
+      return input.shellConfirmed;
     case 'detect':
-      return !input.detecting;
+      return detectionStarted(input) && !input.detecting;
     case 'install':
       return !input.installing && input.hasInstallation;
     case 'select':
@@ -53,12 +71,15 @@ export function navigation(input: StepperInput): {
   readonly canPrev: boolean;
   readonly canNext: boolean;
 } {
-  const { current, detecting, installing, submitting } = input;
-  // 감지, 훅 설치, 보관이 진행 중이면 어느 쪽으로도 옮기지 않는다. 감지 단계는 설치됨 항목이 있어야 넘어간다
+  const { steps, current, detecting, installing, submitting } = input;
+  // 감지, 훅 설치, 보관이 진행 중이면 어느 쪽으로도 옮기지 않는다. 감지 단계는 설치됨 항목이 있어야 넘어간다.
+  // 셸 선택 단계는 늘 넘어갈 수 있다. 다음을 누르는 것이 셸을 확정하는 일이기 때문이다
   if (detecting || installing || submitting) return { canPrev: false, canNext: false };
   return {
-    canPrev: current !== 'detect',
-    canNext: isDone(input, current) && (current !== 'detect' || input.hasInstalled),
+    canPrev: current !== steps[0],
+    canNext:
+      current === 'shell' ||
+      (isDone(input, current) && (current !== 'detect' || input.hasInstalled)),
   };
 }
 
@@ -70,9 +91,9 @@ export type StepIndicator = {
   readonly status: StepStatus;
 };
 
-/** 단계 표시줄. STEPS 순서로 각 단계가 지금 단계인지와 진행 상태를 준다. FR-START-002 */
+/** 단계 표시줄. steps 순서로 각 단계가 지금 단계인지와 진행 상태를 준다. FR-START-002 */
 export function indicators(input: StepperInput): readonly StepIndicator[] {
-  return STEPS.map((id) => ({
+  return input.steps.map((id) => ({
     id,
     current: id === input.current,
     status: isDone(input, id)
@@ -84,12 +105,13 @@ export function indicators(input: StepperInput): readonly StepIndicator[] {
 }
 
 /** 다음 단계. 마지막 단계면 undefined. */
-export function nextStep(current: StepId): StepId | undefined {
-  return STEPS[STEPS.indexOf(current) + 1];
+export function nextStep(steps: readonly StepId[], current: StepId): StepId | undefined {
+  const index = steps.indexOf(current);
+  return index < 0 ? undefined : steps[index + 1];
 }
 
 /** 이전 단계. 첫 단계면 undefined. */
-export function prevStep(current: StepId): StepId | undefined {
-  const index = STEPS.indexOf(current);
-  return index > 0 ? STEPS[index - 1] : undefined;
+export function prevStep(steps: readonly StepId[], current: StepId): StepId | undefined {
+  const index = steps.indexOf(current);
+  return index > 0 ? steps[index - 1] : undefined;
 }

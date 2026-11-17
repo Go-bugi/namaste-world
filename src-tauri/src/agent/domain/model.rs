@@ -87,9 +87,14 @@ pub struct AgentEntry {
 
 /// 감지 한 번의 결과.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Detection {
     pub entries: Vec<AgentEntry>,
+    /// 셸 환경을 읽지 못해 앱 환경으로 감지했다면 그 이유(FR-AGENT-018). 명령 프롬프트를 골랐거나 읽었으면 없다.
+    #[ts(optional)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shell_env_failure: Option<crate::shell::model::ShellEnvFailure>,
 }
 
 /// 감지를 시작한 쪽. 사용자가 요청한 감지만 멈춘 WSL 배포판을 켤 수 있다.
@@ -121,4 +126,34 @@ pub type EnvProbe = Result<BTreeMap<AgentKind, Found>, FailureReason>;
 pub enum HostOs {
     Macos,
     Windows,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shell::model::ShellEnvFailure;
+
+    #[test]
+    fn fr_agent_018_detection_carries_shell_env_failure_to_renderer() {
+        let detection = Detection {
+            entries: vec![],
+            shell_env_failure: Some(ShellEnvFailure::Timeout),
+        };
+
+        let json = serde_json::to_value(&detection).unwrap();
+
+        assert_eq!(json["shellEnvFailure"], "timeout");
+    }
+
+    #[test]
+    fn fr_agent_018_detection_without_failure_has_no_failure_field() {
+        let detection = Detection {
+            entries: vec![],
+            shell_env_failure: None,
+        };
+
+        let json = serde_json::to_value(&detection).unwrap();
+
+        assert!(json.get("shellEnvFailure").is_none(), "{json}");
+    }
 }
