@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0-alpha.4](https://github.com/Go-bugi/namaste-world/compare/v0.1.0-alpha.3...v0.1.0-alpha.4) (2026-11-17)
+
+
+### Features
+
+* **onboarding:** 시작 설정 창에서 에이전트와 모델을 고르고 작은 3D 창으로 전환 ([#19](https://github.com/Go-bugi/namaste-world/issues/19)) ([b9f4164](https://github.com/Go-bugi/namaste-world/commit/b9f4164c35309087057836f38e1eb0110ace3ea1))
+* **onboarding:** 시작 설정을 단계별로 진행하고 에이전트 로그인 상태 확인 추가 ([#22](https://github.com/Go-bugi/namaste-world/issues/22)) ([b778bd1](https://github.com/Go-bugi/namaste-world/commit/b778bd18a8dcbb5e76a9ac37fafef0540f148eb0))
+
+
+### Bug Fixes
+
+* **agent:** 터미널에서 로그인했는데 시작 설정에 로그인 안 됨으로 나오던 문제 수정 ([#23](https://github.com/Go-bugi/namaste-world/issues/23)) ([e460831](https://github.com/Go-bugi/namaste-world/commit/e4608319c89cb7e05f3c6b6a361dab61f9896c05))
+
 ## [0.1.0-alpha.3](https://github.com/Go-bugi/namaste-world/compare/v0.1.0-alpha.2...v0.1.0-alpha.3) (2026-11-14)
 
 
