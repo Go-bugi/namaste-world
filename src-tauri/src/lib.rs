@@ -15,14 +15,15 @@ mod window;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // 앱을 하나만 실행한다. 다시 실행하면 새 앱을 띄우지 않고 켜져 있는 앱에서 지금 쓰는 창을 앞으로 가져온다.
         // 다른 플러그인보다 먼저 등록해야 두 번째 프로세스가 다른 초기화를 하기 전에 끝난다.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             window::show_current(app);
         }))
         // 외부 링크(target="_blank")는 opener 플러그인이 기본 브라우저로 연다.
-        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_opener::init());
+    platform::plugins(builder)
         .manage(state::AgentDetection::new())
         .manage(state::HookInstallState::new())
         .manage(state::SelectionState::new())
@@ -31,6 +32,7 @@ pub fn run() {
         .setup(|app| {
             tasks::agent_detection::spawn_startup_detection(app.handle().clone());
             tasks::hook_server::spawn(app.handle().clone());
+            tasks::display_watch::spawn(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
