@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.5](https://github.com/Go-bugi/namaste-world/compare/v0.1.0-alpha.4...v0.1.0-alpha.5) (2026-11-22)
+
+
+### Features
+
+* **window:** 작은 창을 다른 앱의 전체 화면과 모든 데스크톱 위에 표시하고 모니터가 바뀌면 보이는 곳으로 이동 ([#25](https://github.com/Go-bugi/namaste-world/issues/25)) ([0357c95](https://github.com/Go-bugi/namaste-world/commit/0357c95bb5837cda30e34ad3aa68adee86f5c08c))
+
 ## [0.1.0-alpha.4](https://github.com/Go-bugi/namaste-world/compare/v0.1.0-alpha.3...v0.1.0-alpha.4) (2026-11-17)
 
 
