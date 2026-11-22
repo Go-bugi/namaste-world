@@ -23,8 +23,7 @@ pub fn pick_display(displays: &[Display], window: Rect, primary: Option<usize>) 
     if displays.is_empty() {
         return None;
     }
-    let center_x = i64::from(window.x) + i64::from(window.width) / 2;
-    let center_y = i64::from(window.y) + i64::from(window.height) / 2;
+    let (center_x, center_y) = center(window);
     displays
         .iter()
         .position(|display| contains(display.bounds, center_x, center_y))
@@ -63,6 +62,36 @@ fn far_edge(start: i32, length: u32, size: f64, margin: f64, scale: f64) -> (i32
     let gap = physical(margin).min(length - window);
     let offset = length - window - gap;
     ((i64::from(start) + offset as i64) as i32, window as u32)
+}
+
+/// 창이 보이는 화면을 벗어났으면 옮길 사각형, 벗어나지 않았으면 None.
+/// 창 중심이 어느 모니터의 작업 영역 안에라도 있으면 None이다(`pick_display`와 달리 `bounds`가 아니라 작업 영역을 본다).
+/// 아니면 주 모니터(`primary`, None이거나 범위 밖이면 0번)에 `corner_rect`를 적용한 사각형이다. displays가 비면 None.
+pub fn relocation(
+    displays: &[Display],
+    window: Rect,
+    primary: Option<usize>,
+    size: (f64, f64),
+    margin: f64,
+) -> Option<Rect> {
+    let (center_x, center_y) = center(window);
+    if displays
+        .iter()
+        .any(|display| contains(display.work_area, center_x, center_y))
+    {
+        return None;
+    }
+    let target = primary
+        .and_then(|index| displays.get(index))
+        .or_else(|| displays.first())?;
+    Some(corner_rect(target, size, margin))
+}
+
+fn center(rect: Rect) -> (i64, i64) {
+    (
+        i64::from(rect.x) + i64::from(rect.width) / 2,
+        i64::from(rect.y) + i64::from(rect.height) / 2,
+    )
 }
 
 /// 앱을 다시 불러낼 때 보일 창. 작은 창이 있으면 "main", 없으면 "onboarding".
@@ -325,5 +354,295 @@ mod tests {
     #[test]
     fn fr_window_006_before_switch_shows_onboarding() {
         assert_eq!(window_to_show(false), "onboarding");
+    }
+}
+
+#[cfg(test)]
+mod relocation_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    const SIZE: (f64, f64) = (320.0, 320.0);
+    const MARGIN: f64 = 16.0;
+
+    fn rect(x: i32, y: i32, width: u32, height: u32) -> Rect {
+        Rect {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
+    fn display(bounds: Rect, work_area: Rect, scale: f64) -> Display {
+        Display {
+            bounds,
+            work_area,
+            scale,
+        }
+    }
+
+    fn primary() -> Display {
+        display(rect(0, 0, 1920, 1080), rect(0, 25, 1920, 1015), 1.0)
+    }
+
+    fn secondary() -> Display {
+        display(rect(1920, 0, 2560, 1440), rect(1920, 0, 2560, 1400), 1.0)
+    }
+
+    /// 주 모니터 작업 영역의 오른쪽 아래 구석: x = 1920 - 16 - 320, y = 25 + 1015 - 16 - 320
+    fn primary_corner() -> Rect {
+        rect(1584, 704, 320, 320)
+    }
+
+    #[test]
+    fn fr_window_006_window_moved_to_top_left_stays() {
+        let window = rect(40, 60, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary(), secondary()], window, Some(0), SIZE, MARGIN),
+            None
+        );
+    }
+
+    #[test]
+    fn fr_window_006_secondary_removed_while_hidden_moves_to_primary_corner() {
+        let window = rect(3000, 500, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary()], window, Some(0), SIZE, MARGIN),
+            Some(primary_corner())
+        );
+    }
+
+    #[test]
+    fn fr_window_010_window_on_connected_secondary_stays() {
+        let window = rect(3000, 500, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary(), secondary()], window, Some(0), SIZE, MARGIN),
+            None
+        );
+    }
+
+    #[test]
+    fn fr_window_010_window_on_removed_secondary_moves_to_primary_corner() {
+        let window = rect(4144, 1064, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary()], window, Some(0), SIZE, MARGIN),
+            Some(primary_corner())
+        );
+    }
+
+    #[test]
+    fn fr_window_010_other_display_removed_keeps_window_on_primary() {
+        let window = rect(600, 300, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary()], window, Some(0), SIZE, MARGIN),
+            None
+        );
+    }
+
+    #[test]
+    fn fr_window_010_lower_resolution_pushes_center_out_moves_to_corner() {
+        // 3840x2160에서 오른쪽 아래 구석에 있던 창을, 1280x720으로 낮춘 주 모니터에서 확인한다
+        let lowered = display(rect(0, 0, 1280, 720), rect(0, 25, 1280, 695), 1.0);
+        let window = rect(3504, 1784, 320, 320);
+
+        // x = 1280 - 16 - 320, y = 25 + 695 - 16 - 320
+        assert_eq!(
+            relocation(&[lowered], window, Some(0), SIZE, MARGIN),
+            Some(rect(944, 384, 320, 320))
+        );
+    }
+
+    #[test]
+    fn fr_window_010_rearranged_secondary_leaves_window_nowhere_moves_to_corner() {
+        // 보조 모니터를 주 모니터 왼쪽으로 옮겨 창 중심(3160, 660)이 어느 모니터에도 없다
+        let moved = display(rect(-2560, 0, 2560, 1440), rect(-2560, 0, 2560, 1400), 1.0);
+        let window = rect(3000, 500, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary(), moved], window, Some(0), SIZE, MARGIN),
+            Some(primary_corner())
+        );
+    }
+
+    #[test]
+    fn fr_window_010_center_in_bounds_but_outside_work_area_moves() {
+        // 중심 (1000, 10)은 메뉴 막대(작업 영역 위 25px) 안에 있다
+        let window = rect(840, -150, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary()], window, Some(0), SIZE, MARGIN),
+            Some(primary_corner())
+        );
+    }
+
+    #[test]
+    fn fr_window_010_center_on_work_area_left_top_edge_stays() {
+        // 중심 = (0 + 160, 25) - 작업 영역의 왼쪽 위 끝은 포함한다
+        let window = rect(-160, -135, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary()], window, Some(0), SIZE, MARGIN),
+            None
+        );
+    }
+
+    #[test]
+    fn fr_window_010_center_on_work_area_right_edge_moves() {
+        // 중심 x = 1760 + 160 = 1920 - 작업 영역의 오른쪽 끝은 포함하지 않는다
+        let window = rect(1760, 300, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary()], window, Some(0), SIZE, MARGIN),
+            Some(primary_corner())
+        );
+    }
+
+    #[test]
+    fn fr_window_010_center_on_work_area_bottom_edge_moves() {
+        // 중심 y = 880 + 160 = 1040 = 25 + 1015 - 작업 영역의 아래 끝은 포함하지 않는다
+        let window = rect(600, 880, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary()], window, Some(0), SIZE, MARGIN),
+            Some(primary_corner())
+        );
+    }
+
+    #[test]
+    fn fr_window_010_uses_primary_index_for_corner() {
+        let displays = [secondary(), primary()];
+        let window = rect(-5000, -5000, 320, 320);
+
+        assert_eq!(
+            relocation(&displays, window, Some(1), SIZE, MARGIN),
+            Some(primary_corner())
+        );
+    }
+
+    #[test]
+    fn fr_window_010_unknown_primary_uses_first_display() {
+        let window = rect(-5000, -5000, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary(), secondary()], window, None, SIZE, MARGIN),
+            Some(primary_corner())
+        );
+    }
+
+    #[test]
+    fn fr_window_010_out_of_range_primary_uses_first_display() {
+        let window = rect(-5000, -5000, 320, 320);
+
+        assert_eq!(
+            relocation(&[primary(), secondary()], window, Some(5), SIZE, MARGIN),
+            Some(primary_corner())
+        );
+    }
+
+    #[test]
+    fn fr_window_010_no_displays_is_none() {
+        assert_eq!(
+            relocation(&[], rect(0, 0, 320, 320), Some(0), SIZE, MARGIN),
+            None
+        );
+    }
+
+    #[test]
+    fn fr_window_010_keeps_logical_size_on_scaled_primary() {
+        // 200%: 크기 640, 여백 32
+        let scaled = display(rect(0, 0, 3840, 2160), rect(0, 50, 3840, 2010), 2.0);
+        let window = rect(-5000, -5000, 320, 320);
+
+        // x = 3840 - 32 - 640, y = 50 + 2010 - 32 - 640
+        assert_eq!(
+            relocation(&[scaled], window, Some(0), SIZE, MARGIN),
+            Some(rect(3168, 1388, 640, 640))
+        );
+    }
+
+    #[test]
+    fn fr_window_010_relocated_rect_equals_corner_rect_of_primary() {
+        let displays = [secondary(), primary()];
+        let window = rect(-5000, -5000, 320, 320);
+
+        assert_eq!(
+            relocation(&displays, window, Some(1), SIZE, MARGIN),
+            Some(corner_rect(&displays[1], SIZE, MARGIN))
+        );
+    }
+
+    fn display_strategy() -> impl Strategy<Value = Display> {
+        (
+            -4000i32..4000,
+            -4000i32..4000,
+            1u32..4000,
+            1u32..4000,
+            0u32..100,
+            prop_oneof![Just(1.0), Just(1.25), Just(1.5), Just(2.0), Just(3.0)],
+        )
+            .prop_map(|(x, y, width, height, inset, scale)| {
+                let bounds = rect(x, y, width, height);
+                let inset = inset.min(height - 1);
+                let work_area = rect(x, y + inset as i32, width, height - inset);
+                display(bounds, work_area, scale)
+            })
+    }
+
+    fn window_strategy() -> impl Strategy<Value = Rect> {
+        (-9000i32..9000, -9000i32..9000, 1u32..2000, 1u32..2000)
+            .prop_map(|(x, y, width, height)| rect(x, y, width, height))
+    }
+
+    fn center_in_some_work_area(displays: &[Display], window: Rect) -> bool {
+        let cx = i64::from(window.x) + i64::from(window.width) / 2;
+        let cy = i64::from(window.y) + i64::from(window.height) / 2;
+        displays.iter().any(|d| {
+            let a = d.work_area;
+            (i64::from(a.x)..i64::from(a.x) + i64::from(a.width)).contains(&cx)
+                && (i64::from(a.y)..i64::from(a.y) + i64::from(a.height)).contains(&cy)
+        })
+    }
+
+    proptest! {
+        #[test]
+        fn fr_window_010_moves_only_when_center_is_outside_every_work_area(
+            displays in prop::collection::vec(display_strategy(), 1..4),
+            window in window_strategy(),
+            primary_index in prop::option::of(0usize..5),
+        ) {
+            let got = relocation(&displays, window, primary_index, SIZE, MARGIN);
+
+            prop_assert_eq!(got.is_none(), center_in_some_work_area(&displays, window));
+        }
+
+        #[test]
+        fn fr_window_010_moved_rect_is_primary_corner(
+            displays in prop::collection::vec(display_strategy(), 1..4),
+            window in window_strategy(),
+            primary_index in prop::option::of(0usize..5),
+        ) {
+            let index = primary_index.filter(|i| *i < displays.len()).unwrap_or(0);
+
+            if let Some(got) = relocation(&displays, window, primary_index, SIZE, MARGIN) {
+                prop_assert_eq!(got, corner_rect(&displays[index], SIZE, MARGIN));
+            }
+        }
+
+        #[test]
+        fn fr_window_010_moved_window_needs_no_further_move(
+            displays in prop::collection::vec(display_strategy(), 1..4),
+            window in window_strategy(),
+            primary_index in prop::option::of(0usize..5),
+        ) {
+            if let Some(moved) = relocation(&displays, window, primary_index, SIZE, MARGIN) {
+                prop_assert_eq!(relocation(&displays, moved, primary_index, SIZE, MARGIN), None);
+            }
+        }
     }
 }

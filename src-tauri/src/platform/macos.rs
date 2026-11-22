@@ -17,6 +17,44 @@ pub fn on_run_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
     }
 }
 
+use tauri_nspanel::{tauri_panel, CollectionBehavior, PanelLevel, StyleMask, WebviewWindowExt};
+
+tauri_panel! {
+    panel!(SmallPanel {
+        config: {
+            // 키 창이 될 수 있어야 Cmd+W 같은 단축키를 받는다(FR-WINDOW-007)
+            can_become_key_window: true,
+            is_floating_panel: true
+        }
+    })
+}
+
+/// 작은 창을 포커스를 빼앗지 않는 floating 패널로 바꾸고, 모든 데스크톱과 다른 앱의 전체 화면 공간에 보이게 한다(FR-WINDOW-009).
+/// 독 아이콘이 있는 앱의 보통 창은 다른 앱의 전체 화면 공간에 들어가지 못해 패널로 바꾼다.
+/// 창 클래스를 바꾸는 일은 메인 스레드에서만 할 수 있어 메인 스레드로 넘긴다. 패널에 maximize, fullscreen을 부르면 앱이 죽는다.
+pub fn show_over_full_screen(window: &tauri::WebviewWindow) {
+    let target = window.clone();
+    let _ = window.run_on_main_thread(move || {
+        let Ok(panel) = target.to_panel::<SmallPanel>() else {
+            return;
+        };
+        panel.set_level(PanelLevel::Floating.value());
+        let _ = panel.add_style_mask(StyleMask::empty().nonactivating_panel().into());
+        panel.set_collection_behavior(
+            CollectionBehavior::new()
+                .can_join_all_spaces()
+                .full_screen_auxiliary()
+                .into(),
+        );
+        panel.set_hides_on_deactivate(false);
+    });
+}
+
+/// macOS 전용 플러그인을 붙인다. 작은 창을 패널로 바꾸는 tauri-nspanel이다.
+pub fn plugins<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder.plugin(tauri_nspanel::init())
+}
+
 // ---------------------------------------------------------------- 셸 환경
 
 use super::process;

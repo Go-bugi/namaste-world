@@ -10,8 +10,8 @@ mod windows;
 
 #[cfg(target_os = "macos")]
 pub use macos::{
-    app_dir, git_bash_available, hook_target, on_run_event, on_window_event, read_shell_env,
-    AgentCli, AgentHost, DETECT_AT_STARTUP,
+    app_dir, git_bash_available, hook_target, on_run_event, on_window_event, plugins,
+    read_shell_env, show_over_full_screen, AgentCli, AgentHost, DETECT_AT_STARTUP,
 };
 #[cfg(target_os = "windows")]
 pub use windows::{
@@ -50,6 +50,16 @@ pub const LOGICAL_DESKTOP: bool = false;
 /// macOS가 아니면 창 이벤트는 기본 동작을 따른다.
 #[cfg(not(target_os = "macos"))]
 pub fn on_window_event(_window: &tauri::Window, _event: &tauri::WindowEvent) {}
+
+/// macOS가 아니면 데스크톱과 전체 화면을 따로 다루지 않는다. 항상 위 설정만으로 창 모드 전체 화면 위에 뜬다.
+#[cfg(not(target_os = "macos"))]
+pub fn show_over_full_screen(_window: &tauri::WebviewWindow) {}
+
+/// macOS가 아니면 OS별 플러그인이 없다.
+#[cfg(not(target_os = "macos"))]
+pub fn plugins<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder
+}
 
 /// macOS가 아니면 앱 이벤트에서 따로 할 일이 없다.
 #[cfg(not(target_os = "macos"))]

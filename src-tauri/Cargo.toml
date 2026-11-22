@@ -40,6 +40,10 @@ tauri-plugin-single-instance = "2"
 # 감지할 때 외부 프로세스를 띄우고 시간 제한을 건다. Tauri가 이미 쓰는 tokio 1.x와 같은 크레이트다
 tokio = { version = "1", features = ["process", "time", "sync", "macros", "rt", "net", "fs", "io-util"] }
 
+# 작은 창을 NSPanel로 바꿔 다른 앱의 전체 화면 위에도 보이게 한다. tao와 같은 objc2 0.6을 쓴다
+[target.'cfg(target_os = "macos")'.dependencies]
+tauri-nspanel = "2.1"
+
 [dev-dependencies]
 # 테스트에서 시간을 멈추고 앞당겨 10초 상한을 실제로 기다리지 않고 확인한다
 tokio = { version = "1", features = ["test-util", "rt", "macros"] }

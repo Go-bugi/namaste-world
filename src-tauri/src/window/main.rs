@@ -1,7 +1,8 @@
 //! 작은 창(`main`). 테두리 없이 투명하고 항상 위에 뜨며, 시작 설정 창이 있던 모니터의 오른쪽 아래 구석에 연다.
+//! 모니터 구성이 바뀌거나 다시 불러낼 때 화면을 벗어나 있으면 주 모니터 구석으로 옮긴다.
 
-use crate::placement::{corner_rect, pick_display, Display, Rect};
-use crate::platform::LOGICAL_DESKTOP;
+use crate::placement::{corner_rect, pick_display, relocation, Display, Rect};
+use crate::platform::{self, LOGICAL_DESKTOP};
 use tauri::{
     LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder,
@@ -18,6 +19,7 @@ const MARGIN: f64 = 16.0;
 /// `from`은 시작 설정 창이다. 그 창이 있던 모니터에 연다.
 pub fn open(app: &tauri::AppHandle, from: Option<&WebviewWindow>) -> tauri::Result<WebviewWindow> {
     if let Some(window) = app.get_webview_window(LABEL) {
+        let _ = keep_visible(app);
         window.show()?;
         window.set_focus()?;
         return Ok(window);
@@ -30,10 +32,12 @@ pub fn open(app: &tauri::AppHandle, from: Option<&WebviewWindow>) -> tauri::Resu
         .transparent(true)
         .shadow(false)
         .always_on_top(true)
+        .visible_on_all_workspaces(true)
         .resizable(false)
         .skip_taskbar(false)
         .visible(false)
         .build()?;
+    platform::show_over_full_screen(&window);
     // 자리를 잡다 실패하면 만든 창을 없앤다. 숨은 작은 창이 남으면 다시 불러낼 때 시작 설정 창 대신 그 창이 보인다
     let shown = target_rect(app, from)
         .map_or(Ok(()), |rect| place(&window, rect))
@@ -48,33 +52,34 @@ pub fn open(app: &tauri::AppHandle, from: Option<&WebviewWindow>) -> tauri::Resu
     }
 }
 
-/// 작은 창을 둘 물리 사각형. 모니터 정보를 읽지 못하면 None이고, 그때는 OS가 정한 자리에 연다.
+/// 작은 창이 화면을 벗어났으면 주 모니터 구석으로 옮긴다(FR-WINDOW-006, FR-WINDOW-010).
+/// 작은 창이 없거나 최소화되어 있으면 아무것도 하지 않는다. 최소화된 창은 Windows에서 화면 밖 좌표를 돌려주기 때문이다.
+/// 모니터, 주 모니터, 창 위치를 읽지 못하면 Err다. 확인하지 못한 것이므로 부르는 쪽이 다시 시도할 수 있다.
+pub fn keep_visible(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let Some(window) = app.get_webview_window(LABEL) else {
+        return Ok(());
+    };
+    if window.is_minimized()? {
+        return Ok(());
+    }
+    let (displays, primary) = desktop(app).ok_or_else(|| unread("모니터 목록"))?;
+    // 목록과 주 모니터를 따로 읽어 그 사이 구성이 바뀌면 주 모니터를 찾지 못한다. 엉뚱한 모니터로 옮기지 않고 다시 시도하게 한다
+    let primary = primary.ok_or_else(|| unread("주 모니터"))?;
+    let current = window_rect(&window).ok_or_else(|| unread("작은 창 위치"))?;
+    relocation(&displays, current, Some(primary), SIZE, MARGIN)
+        .map_or(Ok(()), |rect| place(&window, rect))
+}
+
+/// 읽지 못한 값을 알리는 에러.
+fn unread(what: &str) -> tauri::Error {
+    std::io::Error::other(format!("{what}을(를) 읽지 못했습니다")).into()
+}
+
+/// 작은 창을 둘 사각형. 좌표계는 `display_of`와 같다. 모니터 정보를 읽지 못하면 None이고, 그때는 OS가 정한 자리에 연다.
 fn target_rect(app: &tauri::AppHandle, from: Option<&WebviewWindow>) -> Option<Rect> {
-    let monitors = app.available_monitors().ok()?;
-    let displays: Vec<Display> = monitors.iter().map(display_of).collect();
-    let primary = app.primary_monitor().ok().flatten().and_then(|primary| {
-        monitors
-            .iter()
-            .position(|monitor| monitor.position() == primary.position())
-    });
-    let source = from.and_then(|window| {
-        let position = window.outer_position().ok()?;
-        let size = window.outer_size().ok()?;
-        let scale = if LOGICAL_DESKTOP {
-            window.scale_factor().ok()?
-        } else {
-            1.0
-        };
-        Some(scaled_rect(
-            position.x,
-            position.y,
-            size.width,
-            size.height,
-            scale,
-        ))
-    });
+    let (displays, primary) = desktop(app)?;
     // 시작 설정 창이 없으면 주 모니터를 고르도록 어느 모니터에도 속하지 않는 점을 넘긴다
-    let source = source.unwrap_or(Rect {
+    let source = from.and_then(window_rect).unwrap_or(Rect {
         x: i32::MIN / 2,
         y: i32::MIN / 2,
         width: 0,
@@ -82,6 +87,41 @@ fn target_rect(app: &tauri::AppHandle, from: Option<&WebviewWindow>) -> Option<R
     });
     let index = pick_display(&displays, source, primary)?;
     Some(corner_rect(&displays[index], SIZE, MARGIN))
+}
+
+/// 모든 모니터와 주 모니터 번호. 모니터 목록을 읽지 못하면 None이다.
+fn desktop(app: &tauri::AppHandle) -> Option<(Vec<Display>, Option<usize>)> {
+    let monitors = app.available_monitors().ok()?;
+    let displays = monitors.iter().map(display_of).collect();
+    let primary = app.primary_monitor().ok().flatten().and_then(|primary| {
+        monitors
+            .iter()
+            .position(|monitor| monitor.position() == primary.position())
+    });
+    Some((displays, primary))
+}
+
+/// 모니터 구성. 배치 계산과 같은 좌표계라 값이 달라지면 구성이 바뀐 것이다. 읽지 못하면 None이다.
+pub fn displays(app: &tauri::AppHandle) -> Option<Vec<Display>> {
+    desktop(app).map(|(displays, _)| displays)
+}
+
+/// 창의 바깥 사각형. 좌표계는 `display_of`와 같다.
+fn window_rect(window: &WebviewWindow) -> Option<Rect> {
+    let position = window.outer_position().ok()?;
+    let size = window.outer_size().ok()?;
+    let scale = if LOGICAL_DESKTOP {
+        window.scale_factor().ok()?
+    } else {
+        1.0
+    };
+    Some(scaled_rect(
+        position.x,
+        position.y,
+        size.width,
+        size.height,
+        scale,
+    ))
 }
 
 /// 모니터 하나를 배치 계산에 쓰는 좌표계로 바꾼다.
