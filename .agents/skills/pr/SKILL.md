@@ -90,9 +90,9 @@ git diff origin/<base>...HEAD
   - ✗ `feat(renderer): useSearch 훅과 SearchBar 컴포넌트 추가` → ✓ `feat(chat): 대화 기록 검색 추가`
   - ✗ `fix: base.css hover 변수를 gray-1로 변경` → ✓ `fix(ui): 다크 모드에서 버튼 hover 색이 거의 안 바뀌던 문제 수정`
 - **type은 사용자에게 미치는 영향이 가장 큰 것으로 고릅니다.** 브랜치 커밋 중에 `feat`가 하나라도 있으면 제목도 `feat`입니다. 제목에서 `feat`가 빠지면 그 기능은 릴리스 노트에 실리지 않습니다. 반대로 기능을 만들다 생긴 `fix` 커밋은 사용자가 겪은 버그가 아니니 제목에 반영하지 않습니다.
-- **scope는 사용자가 알아보는 영역일 때만 붙입니다.** `chat`, `settings`, `ui`처럼 기능이나 화면 이름은 괜찮습니다. `renderer`, `preload`, `main`처럼 내부 구조 이름은 릴리스 노트 독자에게 의미가 없으니 생략합니다.
+- **scope는 사용자가 알아보는 영역일 때만 붙입니다.** `chat`, `settings`, `ui`처럼 기능이나 화면 이름은 괜찮습니다. `renderer`, `commands`, `tasks`처럼 내부 구조 이름은 릴리스 노트 독자에게 의미가 없으니 생략합니다.
 - **호환성이 깨지면 `feat!:`처럼 `!`를 붙입니다.** 본문은 커밋에 들어가지 않아서 `BREAKING CHANGE:` footer를 본문에 써도 release-please에 전달되지 않습니다.
-- **형식 규칙은 commit 스킬과 같습니다.** `.agents/skills/commit/SKILL.md` 3단계의 IMPORTANT 블록을 읽고 그대로 지킵니다. PR 제목은 CI(`pr-check.yml`)가 commitlint로 검사하므로, 커밋보다 더 확실하게 지켜야 합니다. 특히 설명을 대문자로 시작하는 영어 단어(README, API, Electron)로 시작하지 않습니다.
+- **형식 규칙은 commit 스킬과 같습니다.** `.agents/skills/commit/SKILL.md` 3단계의 IMPORTANT 블록을 읽고 그대로 지킵니다. PR 제목은 CI(`pr-check.yml`)가 commitlint로 검사하므로, 커밋보다 더 확실하게 지켜야 합니다. 특히 설명을 대문자로 시작하는 영어 단어(README, API, Tauri)로 시작하지 않습니다.
 - `release`, `promote` 타입은 Promote 워크플로 전용이라 CI가 막습니다. 쓰지 않습니다.
 
 **`release/* → main` PR은 예외입니다.** merge commit으로 머지하므로 Conventional Commits 형식을 쓰면 main 릴리스 노트에 한 번 더 기록됩니다. 그래서 `Release 1.2.0`처럼 씁니다. 버전은 브랜치 이름에서 가져옵니다. CI도 이 PR은 제목 검사를 건너뜁니다.
