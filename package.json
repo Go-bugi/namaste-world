@@ -37,6 +37,8 @@
     "test:watch": "vitest",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
     "sdd:check": "node --test 'scripts/*.test.mjs'",
+    "floorplan": "node floorplan/serve.mjs",
+    "floorplan:stop": "node floorplan/serve.mjs --stop",
     "build": "pnpm run typecheck && vite build",
     "build:unpack": "tauri build --no-bundle",
     "build:mac": "tauri build --bundles dmg",
