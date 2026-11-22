@@ -14,6 +14,7 @@ pnpm format:check:rust # rustfmt 검사 (format:rust로 자동 수정)
 pnpm test             # Vitest 한 번 실행 (test:watch는 watch 모드)
 pnpm test:rust        # cargo test
 pnpm sdd:check        # SDD 상태 판정 스크립트 테스트 (node:test)
+pnpm floorplan        # floorplan 코드 지도를 로컬 서버로 열기 (floorplan:stop으로 중지)
 pnpm build            # typecheck 후 renderer만 out/renderer에 빌드
 pnpm build:unpack     # 설치 파일 없이 앱 실행 파일만 빌드 (src-tauri/target/release/)
 pnpm build:mac        # dmg 패키징. build:win은 nsis 설치 파일, build:win:arm64는 Windows ARM용 nsis 설치 파일
@@ -24,6 +25,7 @@ pnpm build:mac        # dmg 패키징. build:win은 nsis 설치 파일, build:wi
 - PR CI(`pr-check.yml`)는 `format:check`, `lint`, `test`, `build`, `format:check:rust`, `lint:rust`, `test:rust`를 돌립니다. SDD 검사(`sdd:check`, OpenSpec schema와 스펙 형식 검사)는 별도 job으로 돕니다.
 - Node 24.21.0 이상이 필요합니다(`.nvmrc`). `pnpm-workspace.yaml`의 `engineStrict` 때문에 Node 버전이 낮으면 `pnpm run`과 `pnpm install`이 실패하니, 먼저 `nvm use`를 실행하세요.
 - Rust stable 툴체인이 필요합니다(`Cargo.toml`의 `rust-version` 이상). `rustup update stable`로 맞춥니다.
+- `floorplan/`은 git에 올리지 않는 로컬 산출물입니다. 폴더가 없으면 Claude Code의 floorplan 플러그인으로 지도를 먼저 만들어야 `pnpm floorplan`이 동작합니다.
 - 커밋할 때 husky가 lint-staged로 ESLint, Prettier, rustfmt를 적용합니다. `commit-msg` hook은 없어서 커밋 메시지는 검사하지 않습니다.
 
 ## 구조

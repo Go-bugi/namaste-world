@@ -50,7 +50,7 @@ git diff
 - 서로 무관한 변경이 섞여 있을 때. 어떻게 나눌지 제안합니다.
   ```
   커밋을 두 개로 나누려고 합니다.
-  1. feat(chat): 대화 기록 검색 추가  ← src/renderer/src/..., src/preload/...
+  1. feat(chat): 대화 기록 검색 추가  ← src/renderer/src/..., src-tauri/src/...
   2. chore: eslint 규칙 정리          ← eslint.config.mjs
   ```
 - 이미 staging된 것 중에 실수로 보이는 파일이 있을 때. staging은 사용자가 고른 것이지만 잘못 올렸을 수도 있으니, 그대로 믿지 말고 내용을 봅니다.
@@ -84,7 +84,7 @@ footer (필요할 때만)
 | `style`    | 코드 포맷만 변경                          | 숨김                      |
 | `docs`     | 문서만                                    | 숨김                      |
 | `test`     | 테스트만                                  | 숨김                      |
-| `build`    | 빌드 설정, 의존성, `electron-builder.yml` | 숨김                      |
+| `build`    | 빌드 설정, 의존성, `tauri.conf.json`      | 숨김                      |
 | `ci`       | `.github/` 워크플로, 스크립트             | 숨김                      |
 | `chore`    | 그 밖의 유지 보수                         | 숨김                      |
 
@@ -94,7 +94,7 @@ footer (필요할 때만)
 - `release`와 `promote`는 commitlint상 허용되지만 **Promote 워크플로 전용**입니다. 이 타입으로 커밋하면 develop이나 release 브랜치의 단계 전환 기록과 섞입니다. 사용자가 요청해도 쓰지 말고, GitHub Actions의 Promote 워크플로를 쓰라고 안내합니다.
 - 버전을 바꾸려는 `Release-As:` footer도 쓰지 않습니다. back-merge로 다른 브랜치에 퍼져 버전을 덮어씁니다(`promote.yml` 주석 참고).
 
-**scope**는 선택입니다. 변경이 한 영역에 모여 있을 때 짧은 영어 소문자로 붙입니다(`chat`, `ui`, `main`, `preload`, `release`). 정해진 목록은 없으니, `git log --oneline -20`에 이미 쓰인 scope가 있으면 그걸 우선합니다. 여러 영역에 걸치면 생략합니다.
+**scope**는 선택입니다. 변경이 한 영역에 모여 있을 때 짧은 영어 소문자로 붙입니다(`chat`, `ui`, `settings`, `release`). 정해진 목록은 없으니, `git log --oneline -20`에 이미 쓰인 scope가 있으면 그걸 우선합니다. 여러 영역에 걸치면 생략합니다.
 
 **설명**은 한국어 명사구입니다.
 
@@ -110,9 +110,9 @@ footer (필요할 때만)
 > [!IMPORTANT]
 > **형식 규칙.** 커밋할 때 commitlint를 돌리지 않으므로, 아래 규칙은 메시지를 쓰면서 직접 지켜야 합니다. PR 제목 검사(`pr-check.yml`)가 쓰는 `commitlint.config.mjs`(`@commitlint/config-conventional` 기반)와 같은 규칙입니다. 커밋 메시지가 이 규칙을 지켜야 나중에 PR 제목으로 그대로 옮겨도 CI에서 막히지 않습니다. 커밋하기 전에 한 줄씩 대조합니다.
 >
-> 1. **설명의 첫 글자를 대문자로 쓰지 않습니다.** (`subject-case`) 실제로 가장 자주 걸리는 규칙입니다. README, API, Electron처럼 대문자로 시작하는 영어 단어가 설명 맨 앞에 오면 실패합니다. 어순을 바꿔 한국어로 시작하게 합니다.
+> 1. **설명의 첫 글자를 대문자로 쓰지 않습니다.** (`subject-case`) 실제로 가장 자주 걸리는 규칙입니다. README, API, Tauri처럼 대문자로 시작하는 영어 단어가 설명 맨 앞에 오면 실패합니다. 어순을 바꿔 한국어로 시작하게 합니다.
 >    - ✗ `docs: README에 커밋 규칙 안내 추가` → ✓ `docs: 커밋 규칙 안내를 README에 추가`
->    - ✗ `feat(ui): Electron 버전 복사 버튼 추가` → ✓ `feat(ui): 버전 복사 버튼 추가`
+>    - ✗ `feat(ui): Tauri 버전 복사 버튼 추가` → ✓ `feat(ui): 버전 복사 버튼 추가`
 >    - ✗ `fix: API 키 노출 수정` → ✓ `fix: 노출된 API 키 제거`
 >    - 소문자로 시작하는 이름은 괜찮습니다: `fix: useChatStore 리렌더링 수정`, `fix: macOS 알림 수정`
 > 2. **type은 위 표의 11개 중 하나이고, 소문자입니다.** (`type-enum`, `type-case`) `Feat`, `FIX`는 실패합니다. `release`, `promote`는 쓰지 않습니다.
